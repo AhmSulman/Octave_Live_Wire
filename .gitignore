@@ -1,0 +1,48 @@
+# ── Python ──────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+
+# ── Virtual environment ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+
+# ── Django ───────────────────────────────────────────────────────────────────
+*.log
+local_settings.py
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+
+# ── Media (user uploads — use external storage in production) ────────────────
+media/
+
+# ── Environment variables ────────────────────────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Large audio sample libraries (not loaded by the app — WAV/AIF too big) ──
+Piano/
+DrumsSample/
+dusty_jukebox/
+
+# ── IDE / Editor ─────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# ── OS artefacts ─────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+desktop.ini

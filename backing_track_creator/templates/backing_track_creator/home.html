@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Octave Live Wire — Music Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #030712;
+  --surface: #0f172a;
+  --glass: rgba(15,23,42,0.7);
+  --border: rgba(255,255,255,0.07);
+  --purple: #7c3aed;
+  --purple-light: #a78bfa;
+  --cyan: #0891b2;
+  --cyan-light: #38bdf8;
+  --gold: #d97706;
+  --gold-light: #fbbf24;
+  --green: #059669;
+  --green-light: #34d399;
+  --pink: #be185d;
+  --pink-light: #f472b6;
+  --text: #f1f5f9;
+  --text-muted: #64748b;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  font-family:'Space Grotesk',sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  min-height:100vh;
+  overflow-x:hidden;
+}
+
+/* ── Animated background canvas ── */
+#bgCanvas{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  z-index:0;pointer-events:none;
+}
+
+/* ── Mesh gradient overlay ── */
+.mesh-overlay{
+  position:fixed;top:0;left:0;width:100%;height:100%;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 20%,rgba(124,58,237,.12) 0%,transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 80%,rgba(8,145,178,.10) 0%,transparent 55%),
+    radial-gradient(ellipse 70% 40% at 60% 10%,rgba(217,119,6,.07) 0%,transparent 50%);
+  z-index:0;pointer-events:none;
+  animation:meshShift 12s ease-in-out infinite alternate;
+}
+@keyframes meshShift{
+  from{opacity:.6}
+  to{opacity:1}
+}
+
+/* ── Nav ── */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.9rem 3rem;
+  background:rgba(3,7,18,.8);
+  backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.logo{
+  font-family:'Orbitron',sans-serif;
+  font-weight:900;font-size:1.3rem;letter-spacing:.1em;
+  background:linear-gradient(135deg,var(--purple-light),var(--cyan-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;
+  background-clip:text;
+}
+.nav-links{display:flex;gap:2rem}
+.nav-links a{
+  color:var(--text-muted);font-size:.9rem;font-weight:500;letter-spacing:.05em;
+  text-decoration:none;transition:color .2s;
+}
+.nav-links a:hover{color:var(--text)}
+
+/* ── Hero ── */
+.hero{
+  position:relative;z-index:1;
+  min-height:100vh;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  text-align:center;
+  padding:8rem 2rem 4rem;
+}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.4rem 1.2rem;
+  background:rgba(124,58,237,.15);
+  border:1px solid rgba(167,139,250,.25);
+  border-radius:999px;
+  font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--purple-light);
+  margin-bottom:1.5rem;
+  animation:fadeInDown .8s ease both;
+}
+.hero-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:clamp(3rem,8vw,7rem);
+  font-weight:900;
+  line-height:.95;
+  letter-spacing:-.02em;
+  margin-bottom:1.5rem;
+  animation:fadeInUp .8s .1s ease both;
+}
+.hero-title .line1{
+  display:block;
+  background:linear-gradient(135deg,#fff 30%,var(--purple-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-title .line2{
+  display:block;
+  background:linear-gradient(135deg,var(--cyan-light),var(--green-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.hero-sub{
+  font-size:1.15rem;color:var(--text-muted);max-width:520px;line-height:1.7;
+  margin-bottom:2.5rem;
+  animation:fadeInUp .8s .2s ease both;
+}
+.hero-cta{
+  display:inline-flex;align-items:center;gap:.7rem;
+  padding:.9rem 2.2rem;
+  background:linear-gradient(135deg,var(--purple),var(--cyan));
+  border:none;border-radius:999px;
+  color:#fff;font-family:'Space Grotesk',sans-serif;
+  font-size:1rem;font-weight:700;letter-spacing:.05em;
+  cursor:pointer;text-decoration:none;
+  box-shadow:0 0 40px rgba(124,58,237,.35);
+  transition:all .3s;
+  animation:fadeInUp .8s .3s ease both;
+}
+.hero-cta:hover{
+  transform:translateY(-3px);
+  box-shadow:0 0 60px rgba(124,58,237,.5);
+}
+.scroll-indicator{
+  position:absolute;bottom:2rem;left:50%;transform:translateX(-50%);
+  display:flex;flex-direction:column;align-items:center;gap:.5rem;
+  color:var(--text-muted);font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;
+  animation:bob 2s ease-in-out infinite;
+}
+.scroll-line{width:1px;height:40px;background:linear-gradient(to bottom,var(--purple-light),transparent)}
+@keyframes bob{0%,100%{transform:translateX(-50%) translateY(0)}50%{transform:translateX(-50%) translateY(8px)}}
+
+/* ── Apps Section ── */
+.section{
+  position:relative;z-index:1;
+  padding:6rem 2rem;
+  max-width:1400px;margin:0 auto;
+}
+.section-header{
+  text-align:center;margin-bottom:4rem;
+}
+.section-header h2{
+  font-family:'Orbitron',sans-serif;
+  font-size:clamp(1.8rem,4vw,3rem);font-weight:700;
+  margin-bottom:.8rem;
+}
+.section-header p{color:var(--text-muted);font-size:1.05rem}
+
+/* ── App Cards ── */
+.apps-grid{
+  display:grid;
+  grid-template-columns:repeat(auto-fit,minmax(300px,1fr));
+  gap:1.5rem;
+}
+
+.app-card{
+  position:relative;
+  background:var(--glass);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--border);
+  border-radius:24px;
+  padding:2.5rem;
+  overflow:hidden;
+  text-decoration:none;color:var(--text);
+  cursor:pointer;
+  transition:all .4s cubic-bezier(.23,1,.32,1);
+  display:flex;flex-direction:column;gap:1.2rem;
+}
+.app-card::before{
+  content:'';position:absolute;inset:0;
+  opacity:0;transition:opacity .4s;
+  border-radius:24px;
+}
+.app-card:hover{
+  transform:translateY(-8px) scale(1.01);
+  border-color:transparent;
+}
+.app-card:hover::before{opacity:1}
+
+/* Card 1 – Media Player */
+.card-media::before{background:linear-gradient(135deg,rgba(124,58,237,.15),rgba(8,145,178,.15))}
+.card-media:hover{box-shadow:0 30px 60px rgba(124,58,237,.25),0 0 0 1px rgba(167,139,250,.3)}
+/* Card 2 – Piano */
+.card-piano::before{background:linear-gradient(135deg,rgba(190,24,93,.15),rgba(217,119,6,.15))}
+.card-piano:hover{box-shadow:0 30px 60px rgba(190,24,93,.25),0 0 0 1px rgba(244,114,182,.3)}
+/* Card 3 – Guitar */
+.card-guitar::before{background:linear-gradient(135deg,rgba(5,150,105,.15),rgba(8,145,178,.15))}
+.card-guitar:hover{box-shadow:0 30px 60px rgba(5,150,105,.25),0 0 0 1px rgba(52,211,153,.3)}
+/* Card 4 – Backing */
+.card-backing::before{background:linear-gradient(135deg,rgba(217,119,6,.15),rgba(190,24,93,.12))}
+.card-backing:hover{box-shadow:0 30px 60px rgba(217,119,6,.25),0 0 0 1px rgba(251,191,36,.3)}
+
+.card-icon-wrap{
+  width:64px;height:64px;border-radius:18px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:2rem;position:relative;
+}
+.card-media .card-icon-wrap{background:linear-gradient(135deg,rgba(124,58,237,.3),rgba(8,145,178,.3))}
+.card-piano .card-icon-wrap{background:linear-gradient(135deg,rgba(190,24,93,.3),rgba(217,119,6,.3))}
+.card-guitar .card-icon-wrap{background:linear-gradient(135deg,rgba(5,150,105,.3),rgba(8,145,178,.3))}
+.card-backing .card-icon-wrap{background:linear-gradient(135deg,rgba(217,119,6,.3),rgba(190,24,93,.2))}
+
+.card-tag{
+  font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  padding:.25rem .7rem;border-radius:999px;display:inline-block;width:fit-content;
+}
+.card-media .card-tag{background:rgba(124,58,237,.2);color:var(--purple-light)}
+.card-piano .card-tag{background:rgba(190,24,93,.2);color:var(--pink-light)}
+.card-guitar .card-tag{background:rgba(5,150,105,.2);color:var(--green-light)}
+.card-backing .card-tag{background:rgba(217,119,6,.2);color:var(--gold-light)}
+
+.card-title{
+  font-family:'Orbitron',sans-serif;
+  font-size:1.3rem;font-weight:700;letter-spacing:.02em;
+}
+.card-desc{
+  color:var(--text-muted);font-size:.9rem;line-height:1.65;flex:1;
+}
+.card-features{
+  display:flex;flex-wrap:wrap;gap:.5rem;
+}
+.feature-chip{
+  font-size:.72rem;font-weight:500;
+  padding:.2rem .7rem;
+  border-radius:999px;
+  background:rgba(255,255,255,.06);
+  border:1px solid rgba(255,255,255,.09);
+  color:var(--text-muted);
+}
+.card-launch{
+  display:flex;align-items:center;justify-content:space-between;
+  margin-top:.5rem;
+  padding-top:1rem;
+  border-top:1px solid var(--border);
+}
+.launch-text{font-size:.85rem;font-weight:600;letter-spacing:.05em}
+.card-media .launch-text{color:var(--purple-light)}
+.card-piano .launch-text{color:var(--pink-light)}
+.card-guitar .launch-text{color:var(--green-light)}
+.card-backing .launch-text{color:var(--gold-light)}
+.launch-arrow{font-size:1.2rem;transition:transform .3s}
+.app-card:hover .launch-arrow{transform:translateX(6px)}
+
+/* Decorative card preview SVGs */
+.card-preview{
+  height:80px;width:100%;overflow:hidden;border-radius:12px;
+  background:rgba(0,0,0,.25);
+  display:flex;align-items:center;justify-content:center;
+  position:relative;
+}
+
+/* Waveform preview */
+.wave-preview{display:flex;align-items:center;gap:3px;height:60px}
+.wave-bar{
+  width:4px;border-radius:2px;
+  background:linear-gradient(to top,var(--purple),var(--cyan-light));
+  animation:waveDance 1.2s ease-in-out infinite;
+}
+@keyframes waveDance{
+  0%,100%{height:20%}
+  50%{height:90%}
+}
+
+/* Piano preview */
+.piano-preview{display:flex;gap:2px;align-items:flex-end;height:70px}
+.pw{width:16px;height:65px;background:#f0f0f0;border-radius:0 0 4px 4px;border:1px solid #ccc}
+.pb{
+  width:12px;height:45px;background:#1a1a1a;
+  border-radius:0 0 3px 3px;margin-left:-6px;margin-right:-6px;
+  z-index:2;position:relative;
+}
+.pw.lit{background:linear-gradient(to bottom,var(--pink-light),var(--gold-light));animation:keyGlow 1.5s ease-in-out infinite}
+.pb.lit{background:linear-gradient(to bottom,var(--pink),var(--gold));animation:keyGlow 1.5s .5s ease-in-out infinite}
+@keyframes keyGlow{0%,100%{opacity:.6}50%{opacity:1}}
+
+/* Guitar preview */
+.guitar-preview{position:relative;width:100%;height:70px}
+.fret-line{
+  position:absolute;top:0;bottom:0;width:2px;
+  background:rgba(255,255,255,.15);border-radius:1px;
+}
+.string-line{
+  position:absolute;left:0;right:0;height:1px;
+  background:rgba(255,255,255,.25);
+}
+.fret-dot{
+  position:absolute;width:10px;height:10px;border-radius:50%;
+  background:var(--green-light);box-shadow:0 0 10px var(--green-light);
+  animation:dotPulse 2s ease-in-out infinite;
+}
+@keyframes dotPulse{0%,100%{opacity:.5;transform:scale(1)}50%{opacity:1;transform:scale(1.3)}}
+
+/* Drum grid preview */
+.drum-preview{
+  display:grid;grid-template-columns:repeat(8,1fr);gap:4px;padding:10px;width:100%;
+}
+.drum-cell{
+  height:14px;border-radius:3px;
+  background:rgba(255,255,255,.06);
+  transition:background .2s;
+}
+.drum-cell.active{
+  background:var(--gold-light);
+  box-shadow:0 0 8px rgba(251,191,36,.5);
+  animation:drumFlash 1s ease-in-out infinite;
+}
+@keyframes drumFlash{0%,100%{opacity:.7}50%{opacity:1}}
+
+/* ── Stats bar ── */
+.stats-bar{
+  position:relative;z-index:1;
+  padding:3rem 2rem;
+  display:flex;justify-content:center;
+}
+.stats-inner{
+  display:flex;gap:4rem;
+  padding:2rem 4rem;
+  background:var(--glass);
+  backdrop-filter:blur(20px);
+  border:1px solid var(--border);
+  border-radius:20px;
+}
+.stat{text-align:center}
+.stat-num{
+  font-family:'Orbitron',sans-serif;
+  font-size:2.2rem;font-weight:900;
+  background:linear-gradient(135deg,var(--purple-light),var(--cyan-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+}
+.stat-label{color:var(--text-muted);font-size:.8rem;letter-spacing:.08em;text-transform:uppercase;margin-top:.25rem}
+
+/* ── Footer ── */
+footer{
+  position:relative;z-index:1;
+  text-align:center;padding:2rem;
+  border-top:1px solid var(--border);
+  color:var(--text-muted);font-size:.85rem;
+}
+footer span{
+  background:linear-gradient(135deg,var(--purple-light),var(--cyan-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  font-weight:700;
+}
+
+@keyframes fadeInDown{from{opacity:0;transform:translateY(-20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:768px){
+  nav{padding:.8rem 1.5rem}
+  .nav-links{display:none}
+  .stats-inner{flex-wrap:wrap;gap:2rem;padding:1.5rem 2rem}
+  .hero{padding:7rem 1.5rem 4rem}
+}
+</style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="mesh-overlay"></div>
+
+<nav>
+  <div class="logo">OCTAVE⚡</div>
+  <div class="nav-links">
+    <a href="#apps">Apps</a>
+    <a href="{% url 'backing_track_creator:media_player' %}">Player</a>
+    <a href="{% url 'backing_track_creator:piano_learner' %}">Piano</a>
+    <a href="{% url 'backing_track_creator:guitar_fretboard' %}">Guitar</a>
+    <a href="{% url 'backing_track_creator:backing_track' %}">Studio</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-badge">⚡ Music Creation Suite</div>
+  <h1 class="hero-title">
+    <span class="line1">OCTAVE</span>
+    <span class="line2">LIVE WIRE</span>
+  </h1>
+  <p class="hero-sub">Four professional-grade music tools in one studio. Analyze, learn, visualize, and create — all in your browser.</p>
+  <a href="#apps" class="hero-cta">Explore the Suite ↓</a>
+  <div class="scroll-indicator">
+    <span>Scroll</span>
+    <div class="scroll-line"></div>
+  </div>
+</section>
+
+<!-- Stats -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="stat"><div class="stat-num">4</div><div class="stat-label">Music Tools</div></div>
+    <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Piano Notes</div></div>
+    <div class="stat"><div class="stat-num">6</div><div class="stat-label">Guitar Tunings</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Genres</div></div>
+  </div>
+</div>
+
+<!-- Apps Grid -->
+<section class="section" id="apps">
+  <div class="section-header">
+    <h2>Choose Your Instrument</h2>
+    <p>Click any tool to launch it instantly</p>
+  </div>
+
+  <div class="apps-grid">
+
+    <!-- 1 · Media Player -->
+    <a href="{% url 'backing_track_creator:media_player' %}" class="app-card card-media">
+      <div class="card-icon-wrap">🎵</div>
+      <div class="card-tag">Analyzer</div>
+      <div class="card-preview">
+        <div class="wave-preview" id="wavePreview"></div>
+      </div>
+      <h3 class="card-title">Media Player</h3>
+      <p class="card-desc">Upload any audio file and instantly detect BPM, musical key, and visualize the waveform with studio-grade accuracy.</p>
+      <div class="card-features">
+        <span class="feature-chip">BPM Detection</span>
+        <span class="feature-chip">Key Analysis</span>
+        <span class="feature-chip">Waveform View</span>
+        <span class="feature-chip">Playback Controls</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Launch Player</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- 2 · Piano Learner -->
+    <a href="{% url 'backing_track_creator:piano_learner' %}" class="app-card card-piano">
+      <div class="card-icon-wrap">🎹</div>
+      <div class="card-tag">Learner</div>
+      <div class="card-preview">
+        <div class="piano-preview">
+          <div class="pw lit"></div><div class="pb lit"></div>
+          <div class="pw"></div><div class="pb"></div>
+          <div class="pw lit"></div>
+          <div class="pw"></div><div class="pb"></div>
+          <div class="pw"></div><div class="pb lit"></div>
+          <div class="pw lit"></div><div class="pb"></div>
+          <div class="pw"></div>
+          <div class="pw"></div><div class="pb lit"></div>
+          <div class="pw lit"></div>
+        </div>
+      </div>
+      <h3 class="card-title">Piano Learner</h3>
+      <p class="card-desc">Play a realistic piano with full keyboard support. Explore chords, scales, and compose melodies with an intuitive interface.</p>
+      <div class="card-features">
+        <span class="feature-chip">Full Keyboard</span>
+        <span class="feature-chip">Chord Library</span>
+        <span class="feature-chip">Scale Mode</span>
+        <span class="feature-chip">Auto Compose</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Launch Piano</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- 3 · Guitar Fretboard -->
+    <a href="{% url 'backing_track_creator:guitar_fretboard' %}" class="app-card card-guitar">
+      <div class="card-icon-wrap">🎸</div>
+      <div class="card-tag">Visualizer</div>
+      <div class="card-preview">
+        <div class="guitar-preview" id="guitarPreview">
+          <div class="fret-line" style="left:12%"></div>
+          <div class="fret-line" style="left:24%"></div>
+          <div class="fret-line" style="left:37%"></div>
+          <div class="fret-line" style="left:51%"></div>
+          <div class="fret-line" style="left:66%"></div>
+          <div class="fret-line" style="left:82%"></div>
+          <div class="string-line" style="top:15%"></div>
+          <div class="string-line" style="top:30%"></div>
+          <div class="string-line" style="top:45%"></div>
+          <div class="string-line" style="top:60%"></div>
+          <div class="string-line" style="top:75%"></div>
+          <div class="string-line" style="top:90%"></div>
+          <div class="fret-dot" style="left:17%;top:12%"></div>
+          <div class="fret-dot" style="left:42%;top:57%" class="fret-dot"></div>
+          <div class="fret-dot" style="left:68%;top:27%"></div>
+        </div>
+      </div>
+      <h3 class="card-title">Guitar Fretboard</h3>
+      <p class="card-desc">Interactive fretboard supporting 6 tunings. Visualize scales, highlight chord shapes and explore any position on the neck.</p>
+      <div class="card-features">
+        <span class="feature-chip">6 Tunings</span>
+        <span class="feature-chip">Scale Display</span>
+        <span class="feature-chip">Chord Shapes</span>
+        <span class="feature-chip">Note Labels</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Launch Fretboard</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- 4 · Backing Track Creator -->
+    <a href="{% url 'backing_track_creator:backing_track' %}" class="app-card card-backing">
+      <div class="card-icon-wrap">🥁</div>
+      <div class="card-tag">Studio</div>
+      <div class="card-preview">
+        <div class="drum-preview" id="drumPreview"></div>
+      </div>
+      <h3 class="card-title">Backing Track Creator</h3>
+      <p class="card-desc">Build full backing tracks in seconds. Program drum patterns, chord progressions, and groove to your own beats across 5 genres.</p>
+      <div class="card-features">
+        <span class="feature-chip">Drum Sequencer</span>
+        <span class="feature-chip">Chord Progressions</span>
+        <span class="feature-chip">5 Genres</span>
+        <span class="feature-chip">Tap Tempo</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Open Studio</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
+  </div>
+</section>
+
+<footer>
+  <p>Built with ♪ by AHMED SALMAN <span>Octave Live Wire</span> · Professional Music Creation Suite</p>
+</footer>
+
+<script>
+// ── Particle Canvas Background ──
+const canvas = document.getElementById('bgCanvas');
+const ctx = canvas.getContext('2d');
+let W, H, particles = [];
+
+function resize(){
+  W = canvas.width = window.innerWidth;
+  H = canvas.height = window.innerHeight;
+}
+resize();
+window.addEventListener('resize', resize);
+
+const COLORS = ['#7c3aed','#0891b2','#d97706','#059669','#be185d'];
+
+function initParticles(){
+  particles = [];
+  const count = Math.min(80, Math.floor((W * H) / 15000));
+  for(let i = 0; i < count; i++){
+    particles.push({
+      x: Math.random() * W, y: Math.random() * H,
+      vx: (Math.random() - .5) * .4, vy: (Math.random() - .5) * .4,
+      r: Math.random() * 2 + .5,
+      alpha: Math.random() * .4 + .05,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)]
+    });
+  }
+}
+initParticles();
+window.addEventListener('resize', initParticles);
+
+function animateParticles(){
+  ctx.clearRect(0, 0, W, H);
+  for(let i = 0; i < particles.length; i++){
+    const p = particles[i];
+    p.x += p.vx; p.y += p.vy;
+    if(p.x < 0) p.x = W; if(p.x > W) p.x = 0;
+    if(p.y < 0) p.y = H; if(p.y > H) p.y = 0;
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+    ctx.fillStyle = p.color;
+    ctx.globalAlpha = p.alpha;
+    ctx.fill();
+  }
+  // Draw connections
+  ctx.lineWidth = .4;
+  for(let i = 0; i < particles.length; i++){
+    for(let j = i + 1; j < particles.length; j++){
+      const dx = particles[i].x - particles[j].x;
+      const dy = particles[i].y - particles[j].y;
+      const dist = Math.sqrt(dx*dx + dy*dy);
+      if(dist < 130){
+        ctx.globalAlpha = (1 - dist/130) * .06;
+        ctx.strokeStyle = '#7c3aed';
+        ctx.beginPath();
+        ctx.moveTo(particles[i].x, particles[i].y);
+        ctx.lineTo(particles[j].x, particles[j].y);
+        ctx.stroke();
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+  requestAnimationFrame(animateParticles);
+}
+animateParticles();
+
+// ── Wave preview bars ──
+const wavePreview = document.getElementById('wavePreview');
+const heights = [20,40,70,55,90,65,30,80,45,60,85,35,70,50,25,90,60,40,75,50];
+heights.forEach((h, i) => {
+  const bar = document.createElement('div');
+  bar.className = 'wave-bar';
+  bar.style.height = h + '%';
+  bar.style.animationDelay = (i * 0.06) + 's';
+  bar.style.animationDuration = (0.8 + Math.random() * 0.8) + 's';
+  wavePreview.appendChild(bar);
+});
+
+// ── Drum grid preview ──
+const drumPreview = document.getElementById('drumPreview');
+const pattern = [1,0,0,1,0,0,1,0, 0,0,1,0,0,0,1,0, 1,1,0,1,1,0,1,1];
+pattern.forEach(active => {
+  const cell = document.createElement('div');
+  cell.className = 'drum-cell' + (active ? ' active' : '');
+  if(active) cell.style.animationDelay = (Math.random() * .5) + 's';
+  drumPreview.appendChild(cell);
+});
+</script>
+</body>
+</html>
