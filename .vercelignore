@@ -1,0 +1,42 @@
+# Large audio sample libraries — not needed at runtime
+DrumsSample/
+Piano/
+dusty_jukebox/
+
+# User-uploaded media — use external storage in production
+media/
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+.venv/
+venv/
+env/
+
+# Django
+db.sqlite3
+db.sqlite3-journal
+staticfiles/
+*.log
+local_settings.py
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# Git / Claude
+.git/
+.claude/
