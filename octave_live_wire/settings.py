@@ -7,6 +7,8 @@ load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+_on_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
 # ── Core ─────────────────────────────────────────────────────────────────────
 
 SECRET_KEY = os.environ.get(
@@ -21,6 +23,11 @@ ALLOWED_HOSTS = [
     for h in os.environ.get("ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
     if h.strip()
 ]
+if _on_vercel:
+    ALLOWED_HOSTS += [".vercel.app"]
+    _vercel_url = os.environ.get("VERCEL_URL", "")
+    if _vercel_url:
+        ALLOWED_HOSTS.append(_vercel_url)
 
 # ── CSRF ─────────────────────────────────────────────────────────────────────
 
@@ -79,8 +86,6 @@ WSGI_APPLICATION = "octave_live_wire.wsgi.application"
 # Vercel's filesystem is ephemeral; /tmp persists for the Lambda lifetime only.
 # For durable data, swap to PostgreSQL via DATABASE_URL.
 
-_on_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
-
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
@@ -124,7 +129,7 @@ STORAGES = {
 # for durable media in production.
 
 MEDIA_URL = "/media/"
-MEDIA_ROOT = BASE_DIR / "media"
+MEDIA_ROOT = Path("/tmp/media") if _on_vercel else BASE_DIR / "media"
 
 # ── Security hardening (active when DEBUG=False) ──────────────────────────────
 
