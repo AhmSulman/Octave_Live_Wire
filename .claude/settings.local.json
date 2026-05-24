@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"c:\\\\Users\\\\ahmed\\\\Desktop\\\\Octave_live_wire\")",
+      "Bash(New-Item -ItemType Directory -Force -Path \"c:\\\\Users\\\\ahmed\\\\Desktop\\\\Octave_live_wire\\\\backing_track_creator\\\\templates\\\\backing_track_creator\")",
+      "Bash(python manage.py check --deploy)",
+      "Bash(python manage.py check)",
+      "Bash(python manage.py makemigrations backing_track_creator)",
+      "Bash(python manage.py migrate)"
+    ]
+  }
+}
