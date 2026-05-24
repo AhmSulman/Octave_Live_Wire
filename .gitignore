@@ -20,7 +20,6 @@ ENV/
 local_settings.py
 db.sqlite3
 db.sqlite3-journal
-staticfiles/
 
 # ── Media (user uploads — use external storage in production) ────────────────
 media/
@@ -46,3 +45,5 @@ dusty_jukebox/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+.vercel
