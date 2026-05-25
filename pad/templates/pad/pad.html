@@ -820,7 +820,6 @@ transpose(0)</div>
 // ═══════════════════════════════════════════════════════════════════
 // AUDIO ENGINE (Tone.js)
 // ═══════════════════════════════════════════════════════════════════
-const PIANO_BASE = "{% static 'Piano/' %}";
 const NOTE_NAMES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
 
 function midiToTone(midi){
@@ -833,20 +832,27 @@ const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.22 }).toDestination();
 reverb.generate().catch(() => {});
 const chorus = new Tone.Chorus(3.5, 2, 0.4).connect(reverb).start();
 
-// Piano sampler
+// Piano sampler — explicit {% static %} URLs so WhiteNoise hashed paths resolve correctly
 let samplerReady = false;
 const pianoSampler = new Tone.Sampler({
   urls: {
-    C2:'Piano.pp.C2.wav', E2:'Piano.pp.E2.wav', A2:'Piano.pp.A2.wav',
-    C3:'Piano.pp.C3.wav', E3:'Piano.pp.E3.wav', A3:'Piano.pp.A3.wav',
-    C4:'Piano.pp.C4.wav', E4:'Piano.pp.E4.wav', A4:'Piano.pp.A4.wav',
-    C5:'Piano.pp.C5.wav', E5:'Piano.pp.E5.wav', A5:'Piano.pp.A5.wav',
-    C6:'Piano.pp.C6.wav',
+    C2: "{% static 'Piano/Piano.pp.C2.wav' %}",
+    E2: "{% static 'Piano/Piano.pp.E2.wav' %}",
+    A2: "{% static 'Piano/Piano.pp.A2.wav' %}",
+    C3: "{% static 'Piano/Piano.pp.C3.wav' %}",
+    E3: "{% static 'Piano/Piano.pp.E3.wav' %}",
+    A3: "{% static 'Piano/Piano.pp.A3.wav' %}",
+    C4: "{% static 'Piano/Piano.pp.C4.wav' %}",
+    E4: "{% static 'Piano/Piano.pp.E4.wav' %}",
+    A4: "{% static 'Piano/Piano.pp.A4.wav' %}",
+    C5: "{% static 'Piano/Piano.pp.C5.wav' %}",
+    E5: "{% static 'Piano/Piano.pp.E5.wav' %}",
+    A5: "{% static 'Piano/Piano.pp.A5.wav' %}",
+    C6: "{% static 'Piano/Piano.pp.C6.wav' %}",
   },
-  baseUrl: PIANO_BASE,
   release: 1.5,
-  onload: () => { samplerReady = true; log('Piano samples loaded', 'info'); },
-  onerror: () => log('Piano samples failed — using synth fallback', 'stat'),
+  onload: () => { samplerReady = true; log('Piano samples loaded ✓', 'ok'); },
+  onerror: (e) => log('Piano samples failed: ' + e + ' — using synth fallback', 'err'),
 }).connect(reverb);
 
 // Synth (warm AM)
