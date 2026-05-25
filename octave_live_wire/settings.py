@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "backing_track_creator",
+    "pad",
 ]
 
 # ── Middleware ────────────────────────────────────────────────────────────────
@@ -113,6 +114,9 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_DIRS = [
+    ("Piano", BASE_DIR / "Piano"),
+]
 
 STORAGES = {
     "default": {

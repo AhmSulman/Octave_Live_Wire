@@ -1,0 +1,1429 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pad — Code Music in Python · Octave Live Wire</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎹</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+:root{
+  --bg:#030712;--surface:#0d1626;--glass:rgba(13,22,38,.85);
+  --border:rgba(255,255,255,.07);--border2:rgba(255,255,255,.12);
+  --violet:#7c3aed;--violet-l:#a78bfa;--violet-d:#4c1d95;
+  --cyan:#0891b2;--cyan-l:#38bdf8;
+  --green:#059669;--green-l:#34d399;
+  --gold:#d97706;--gold-l:#fbbf24;
+  --red:#dc2626;--red-l:#f87171;
+  --text:#f1f5f9;--muted:#64748b;--muted2:#94a3b8;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text)}
+
+/* ── Topbar ── */
+.topbar{
+  height:52px;display:flex;align-items:center;gap:.75rem;
+  padding:0 1rem;
+  background:rgba(3,7,18,.95);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);flex-shrink:0;z-index:60;
+}
+.logo{font-family:'Orbitron',sans-serif;font-weight:900;font-size:.95rem;
+  background:linear-gradient(135deg,var(--violet-l),var(--cyan-l));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  white-space:nowrap;margin-right:.25rem}
+.sep{width:1px;height:22px;background:var(--border2);flex-shrink:0}
+.tb-label{font-size:.7rem;font-weight:600;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+.tb-input{
+  padding:.3rem .55rem;border-radius:6px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:var(--text);font-size:.82rem;outline:none;
+  font-family:'Space Grotesk',sans-serif;
+}
+.tb-input:focus{border-color:var(--violet-l)}
+#bpmInput{width:62px;text-align:center}
+.tb-select{
+  padding:.3rem .55rem;border-radius:6px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:var(--text);font-size:.82rem;outline:none;cursor:pointer;
+}
+.tb-select option{background:#0d1626}
+.tb-select:focus{border-color:var(--violet-l)}
+.run-btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.38rem .9rem;border-radius:8px;border:none;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:700;
+  transition:all .2s;letter-spacing:.04em;
+  background:linear-gradient(135deg,var(--violet),var(--violet-d));color:#fff;
+}
+.run-btn:hover{box-shadow:0 0 18px rgba(124,58,237,.5);transform:translateY(-1px)}
+.run-btn:active{transform:translateY(0)}
+.run-btn:disabled{opacity:.5;pointer-events:none}
+.stop-btn{
+  display:inline-flex;align-items:center;gap:.4rem;
+  padding:.38rem .9rem;border-radius:8px;border:1px solid var(--border);cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:.82rem;font-weight:700;
+  background:rgba(255,255,255,.07);color:var(--muted2);transition:all .2s;
+}
+.stop-btn:hover{color:var(--red-l);border-color:var(--red-l)}
+.back-btn{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.35rem .8rem;border-radius:999px;
+  background:rgba(255,255,255,.06);border:1px solid var(--border);
+  color:var(--muted);font-size:.78rem;text-decoration:none;transition:all .2s;
+  margin-left:auto;white-space:nowrap;
+}
+.back-btn:hover{color:var(--text);background:rgba(255,255,255,.12)}
+.status-pill{
+  display:inline-flex;align-items:center;gap:.35rem;
+  padding:.25rem .7rem;border-radius:999px;font-size:.72rem;font-weight:600;
+  background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
+  white-space:nowrap;
+}
+.status-pill.running{background:rgba(124,58,237,.15);border-color:rgba(167,139,250,.4);color:var(--violet-l)}
+.status-pill.ok{background:rgba(5,150,105,.12);border-color:rgba(52,211,153,.3);color:var(--green-l)}
+.status-pill.err{background:rgba(220,38,38,.12);border-color:rgba(248,113,113,.3);color:var(--red-l)}
+.pulse{width:7px;height:7px;border-radius:50%;background:currentColor;animation:pulse 1s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+
+/* ── Main layout ── */
+.layout{display:grid;grid-template-columns:270px 1fr 260px;height:calc(100vh - 52px);overflow:hidden}
+
+/* ── Docs panel ── */
+.docs-panel{
+  background:rgba(10,16,30,.7);border-right:1px solid var(--border);
+  overflow-y:auto;display:flex;flex-direction:column;
+}
+.docs-panel::-webkit-scrollbar{width:4px}
+.docs-panel::-webkit-scrollbar-thumb{background:rgba(167,139,250,.25);border-radius:2px}
+.docs-search{
+  padding:.6rem .75rem;position:sticky;top:0;z-index:10;
+  background:rgba(10,16,30,.95);border-bottom:1px solid var(--border);
+}
+.docs-search input{
+  width:100%;padding:.4rem .7rem;border-radius:8px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:var(--text);font-size:.8rem;outline:none;
+}
+.docs-search input:focus{border-color:var(--violet-l)}
+.docs-search input::placeholder{color:var(--muted)}
+.doc-section{border-bottom:1px solid var(--border)}
+.doc-section-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.6rem .75rem;cursor:pointer;user-select:none;
+  font-size:.72rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--violet-l);transition:background .15s;
+}
+.doc-section-hdr:hover{background:rgba(124,58,237,.08)}
+.doc-section-hdr .arrow{transition:transform .2s;font-size:.65rem;color:var(--muted)}
+.doc-section-hdr.open .arrow{transform:rotate(90deg)}
+.doc-body{display:none;padding:.3rem .75rem .75rem;flex-direction:column;gap:.5rem}
+.doc-body.open{display:flex}
+.doc-fn{
+  background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:8px;
+  overflow:hidden;
+}
+.doc-fn-sig{
+  padding:.45rem .6rem;
+  font-family:'JetBrains Mono',monospace;font-size:.73rem;
+  color:var(--cyan-l);background:rgba(8,145,178,.06);
+  border-bottom:1px solid var(--border);
+  cursor:pointer;transition:background .15s;
+  display:flex;align-items:center;gap:.4rem;
+}
+.doc-fn-sig:hover{background:rgba(8,145,178,.12)}
+.doc-fn-sig .insert-hint{font-size:.6rem;color:var(--muted);margin-left:auto;opacity:0;transition:opacity .15s}
+.doc-fn-sig:hover .insert-hint{opacity:1}
+.doc-fn-body{padding:.45rem .6rem;font-size:.73rem;color:var(--muted2);line-height:1.55}
+.doc-fn-body b{color:var(--text);font-weight:600}
+.doc-param{padding:.15rem 0;display:flex;gap:.4rem}
+.doc-param-name{color:var(--gold-l);font-family:'JetBrains Mono',monospace;font-size:.7rem;white-space:nowrap}
+.doc-param-desc{color:var(--muted2);font-size:.7rem}
+.note-table{width:100%;border-collapse:collapse;font-size:.71rem}
+.note-table th{color:var(--muted);font-weight:600;padding:.25rem .4rem;border-bottom:1px solid var(--border);text-align:left}
+.note-table td{padding:.2rem .4rem;border-bottom:1px solid rgba(255,255,255,.04);font-family:'JetBrains Mono',monospace}
+.note-table td:first-child{color:var(--gold-l)}
+.note-table td:nth-child(2){color:var(--cyan-l)}
+.note-table td:nth-child(3){color:var(--muted)}
+.example-card{
+  background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;overflow:hidden;
+}
+.example-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:.4rem .6rem;font-size:.72rem;font-weight:600;color:var(--muted2);
+  background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);
+}
+.example-insert{
+  font-size:.65rem;padding:.15rem .45rem;border-radius:4px;border:1px solid var(--violet-l);
+  color:var(--violet-l);background:transparent;cursor:pointer;font-family:'Space Grotesk',sans-serif;
+  transition:all .15s;
+}
+.example-insert:hover{background:var(--violet);color:#fff;border-color:var(--violet)}
+.example-code{
+  padding:.5rem .6rem;font-family:'JetBrains Mono',monospace;font-size:.68rem;
+  color:var(--green-l);line-height:1.6;white-space:pre;overflow-x:auto;
+}
+.tag-chip{
+  display:inline-block;padding:.12rem .45rem;border-radius:999px;font-size:.64rem;font-weight:700;
+  background:rgba(167,139,250,.15);color:var(--violet-l);border:1px solid rgba(167,139,250,.25);
+  margin:.1rem;
+}
+
+/* ── Center: tracks + roll ── */
+.center-col{display:flex;flex-direction:column;overflow:hidden}
+.tracks-area{flex:1;overflow-y:auto;overflow-x:hidden;padding:.6rem .75rem .3rem}
+.tracks-area::-webkit-scrollbar{width:4px}
+.tracks-area::-webkit-scrollbar-thumb{background:rgba(167,139,250,.2);border-radius:2px}
+
+/* ── Track card ── */
+.track-card{
+  margin-bottom:.6rem;border-radius:12px;overflow:hidden;
+  border:1px solid var(--border);background:rgba(13,22,38,.6);
+}
+.track-hdr{
+  display:flex;align-items:center;gap:.5rem;padding:.45rem .75rem;
+  background:rgba(255,255,255,.03);border-bottom:1px solid var(--border);
+}
+.arm-btn{
+  width:32px;height:22px;border-radius:5px;border:1px solid var(--border);
+  background:rgba(255,255,255,.06);cursor:pointer;
+  font-size:.62rem;font-weight:700;color:var(--muted);transition:all .2s;
+  display:flex;align-items:center;justify-content:center;
+}
+.arm-btn.armed{background:rgba(5,150,105,.25);border-color:rgba(52,211,153,.5);color:var(--green-l)}
+.arm-btn:hover{border-color:var(--green-l);color:var(--green-l)}
+.track-label{font-family:'Orbitron',sans-serif;font-size:.65rem;font-weight:700;color:var(--muted2)}
+.track-inst-sel{
+  padding:.22rem .5rem;border-radius:5px;
+  background:rgba(255,255,255,.07);border:1px solid var(--border);
+  color:var(--text);font-size:.75rem;outline:none;cursor:pointer;
+}
+.track-inst-sel option{background:#0d1626}
+.track-remove{
+  margin-left:auto;width:22px;height:22px;border-radius:4px;
+  border:none;background:transparent;color:var(--muted);cursor:pointer;font-size:.9rem;
+  display:flex;align-items:center;justify-content:center;transition:color .15s;
+}
+.track-remove:hover{color:var(--red-l)}
+.editor-wrap{position:relative}
+.editor-container{height:160px}
+.resize-handle{
+  height:6px;background:rgba(255,255,255,.03);cursor:row-resize;
+  display:flex;align-items:center;justify-content:center;
+}
+.resize-handle::after{content:'';width:32px;height:2px;border-radius:1px;background:rgba(255,255,255,.1)}
+.resize-handle:hover::after{background:var(--violet-l)}
+
+.add-track-btn{
+  display:flex;align-items:center;justify-content:center;gap:.4rem;
+  width:100%;padding:.5rem;border-radius:8px;border:1px dashed rgba(124,58,237,.3);
+  background:transparent;color:rgba(167,139,250,.6);cursor:pointer;font-size:.78rem;
+  font-family:'Space Grotesk',sans-serif;transition:all .2s;margin-bottom:.5rem;
+}
+.add-track-btn:hover{border-color:var(--violet-l);color:var(--violet-l);background:rgba(124,58,237,.08)}
+
+/* ── Piano roll ── */
+.roll-wrap{
+  height:130px;flex-shrink:0;border-top:1px solid var(--border);
+  background:rgba(5,8,20,.8);position:relative;
+}
+.roll-label{
+  position:absolute;top:4px;left:8px;
+  font-size:.6rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  color:var(--muted);pointer-events:none;z-index:2;
+}
+#pianoRoll{width:100%;height:100%;display:block}
+
+/* ── Console panel ── */
+.console-panel{
+  background:rgba(8,14,26,.8);border-left:1px solid var(--border);
+  display:flex;flex-direction:column;overflow:hidden;
+}
+.console-hdr{
+  padding:.5rem .75rem;border-bottom:1px solid var(--border);
+  font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--muted);display:flex;align-items:center;justify-content:space-between;flex-shrink:0;
+}
+.console-clear{
+  font-size:.65rem;padding:.1rem .4rem;border-radius:4px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;font-family:'Space Grotesk',sans-serif;
+}
+.console-clear:hover{color:var(--text);border-color:var(--muted2)}
+.console-body{
+  flex:1;overflow-y:auto;padding:.5rem .75rem;
+  font-family:'JetBrains Mono',monospace;font-size:.72rem;line-height:1.65;
+}
+.console-body::-webkit-scrollbar{width:3px}
+.console-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+.con-line{padding:.1rem 0;border-bottom:1px solid rgba(255,255,255,.03);word-break:break-all}
+.con-ok{color:var(--green-l)}
+.con-err{color:var(--red-l)}
+.con-print{color:var(--cyan-l)}
+.con-stat{color:var(--muted2)}
+.con-info{color:var(--violet-l)}
+
+/* ── Stats bar inside console ── */
+.stats-bar{
+  flex-shrink:0;padding:.5rem .75rem;border-top:1px solid var(--border);
+  display:grid;grid-template-columns:1fr 1fr;gap:.3rem;
+}
+.stat-item{display:flex;flex-direction:column;gap:.1rem}
+.stat-value{font-family:'JetBrains Mono',monospace;font-size:.85rem;font-weight:700;color:var(--violet-l)}
+.stat-label{font-size:.62rem;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+
+/* ── Toast ── */
+.toast{
+  position:fixed;bottom:1rem;right:1rem;z-index:200;
+  padding:.55rem 1rem;border-radius:8px;font-size:.78rem;font-weight:600;
+  transform:translateY(120%);transition:transform .3s;pointer-events:none;
+}
+.toast.show{transform:translateY(0)}
+.toast-ok{background:linear-gradient(135deg,#065f46,#059669);color:#fff}
+.toast-err{background:linear-gradient(135deg,#7f1d1d,#ef4444);color:#fff}
+.toast-info{background:rgba(124,58,237,.9);color:#fff;border:1px solid var(--violet-l)}
+
+@media(max-width:900px){
+  .layout{grid-template-columns:1fr}
+  .docs-panel,.console-panel{display:none}
+}
+</style>
+</head>
+<body>
+
+<!-- ══ Topbar ══════════════════════════════════════════════════════════ -->
+<div class="topbar">
+  <div class="logo">🎹 PAD</div>
+  <div class="sep"></div>
+
+  <span class="tb-label">BPM</span>
+  <input class="tb-input" id="bpmInput" type="number" value="120" min="20" max="400">
+
+  <div class="sep"></div>
+  <span class="tb-label">Root</span>
+  <select class="tb-select" id="rootSel">
+    <option>C</option><option>Db</option><option>D</option><option>Eb</option>
+    <option>E</option><option>F</option><option>Gb</option><option>G</option>
+    <option>Ab</option><option>A</option><option>Bb</option><option>B</option>
+  </select>
+
+  <select class="tb-select" id="scaleSel">
+    <option value="chromatic">Chromatic</option>
+    <option value="major">Major</option>
+    <option value="minor">Minor</option>
+    <option value="pentatonic_major">Pentatonic Major</option>
+    <option value="pentatonic_minor" selected>Pentatonic Minor</option>
+    <option value="blues">Blues</option>
+    <option value="dorian">Dorian</option>
+    <option value="phrygian">Phrygian</option>
+    <option value="mixolydian">Mixolydian</option>
+    <option value="harmonic_minor">Harmonic Minor</option>
+    <option value="whole_tone">Whole Tone</option>
+  </select>
+
+  <div class="sep"></div>
+  <button class="run-btn" id="runBtn" onclick="runAll()">▶ Run</button>
+  <button class="stop-btn" id="stopBtn" onclick="stopAll()">■ Stop</button>
+  <div class="status-pill" id="statusPill">idle</div>
+
+  <button class="stop-btn" onclick="clearSession()" title="Clear saved session and reload defaults" style="font-size:.72rem;padding:.3rem .7rem;opacity:.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">↺ Reset</button>
+  <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+</div>
+
+<!-- ══ Layout ══════════════════════════════════════════════════════════ -->
+<div class="layout">
+
+  <!-- ── Docs panel ── -->
+  <div class="docs-panel" id="docsPanel">
+    <div class="docs-search">
+      <input id="docSearch" placeholder="Search functions, notes…" oninput="filterDocs(this.value)">
+    </div>
+
+    <!-- Functions -->
+    <div class="doc-section" id="sec-functions">
+      <div class="doc-section-hdr open" onclick="toggleSection(this)">
+        Functions <span class="arrow">▶</span>
+      </div>
+      <div class="doc-body open" id="body-functions">
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('play_note(0)')">
+            play_note(step, duration=0.5, velocity=90)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Play one note. Time advances by <b>duration</b> beats.
+            <div class="doc-param"><span class="doc-param-name">step</span><span class="doc-param-desc">scale degree (0=root, 1=2nd, 7=next octave root, negative=below root)</span></div>
+            <div class="doc-param"><span class="doc-param-name">duration</span><span class="doc-param-desc">beats — use named constants: <b>quarter_note</b>, <b>eighth_note</b>, <b>H</b>, <b>W</b>…</span></div>
+            <div class="doc-param"><span class="doc-param-name">velocity</span><span class="doc-param-desc">loudness 0–127 (90 = natural forte, 127 = max)</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('play_chord([0, 2, 4])')">
+            play_chord(steps, duration=1, velocity=90)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Play multiple notes simultaneously. Advances by <b>duration</b>.
+            <div class="doc-param"><span class="doc-param-name">steps</span><span class="doc-param-desc">list of scale degrees e.g. [0, 2, 4] = root triad, [0, 4, 7] = chromatic major</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('play_drum(0)')">
+            play_drum(drum=0, velocity=90)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Trigger a drum at current cursor. <b>Does not advance time</b> — use <b>rest()</b> after.
+            <div class="doc-param"><span class="doc-param-name">0</span><span class="doc-param-desc">Kick</span></div>
+            <div class="doc-param"><span class="doc-param-name">1</span><span class="doc-param-desc">Snare</span></div>
+            <div class="doc-param"><span class="doc-param-name">2</span><span class="doc-param-desc">Hi-hat (closed)</span></div>
+            <div class="doc-param"><span class="doc-param-name">3</span><span class="doc-param-desc">Open hat</span></div>
+            <div class="doc-param"><span class="doc-param-name">4</span><span class="doc-param-desc">Clap</span></div>
+            <div class="doc-param"><span class="doc-param-name">5</span><span class="doc-param-desc">Tom</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('rest(quarter_note)')">
+            rest(duration=1)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Silence for <b>duration</b> beats. Accepts named constants.</div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('set_bpm(120)')">
+            set_bpm(bpm)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Change tempo mid-song. Affects all subsequent beat→second conversions.</div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet(&quot;set_instrument('piano')&quot;)">
+            set_instrument(name)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Switch instrument for this track.
+            <div class="doc-param"><span class="doc-param-name">'piano'</span><span class="doc-param-desc">Real piano samples — warm, natural</span></div>
+            <div class="doc-param"><span class="doc-param-name">'synth'</span><span class="doc-param-desc">Sine-AM synth — smooth, electronic</span></div>
+            <div class="doc-param"><span class="doc-param-name">'pad'</span><span class="doc-param-desc">Slow-attack pad — atmospheric</span></div>
+            <div class="doc-param"><span class="doc-param-name">'bass'</span><span class="doc-param-desc">Fat triangle bass — one octave below</span></div>
+            <div class="doc-param"><span class="doc-param-name">'pluck'</span><span class="doc-param-desc">Karplus-Strong pluck — guitar-like</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet(&quot;set_scale('A', 'minor')&quot;)">
+            set_scale(root, scale_type)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Override the global scale in code. Both args optional.
+            <div class="doc-param"><span class="doc-param-name">root</span><span class="doc-param-desc">'C' 'Db' 'D' 'Eb' 'E' 'F' 'Gb' 'G' 'Ab' 'A' 'Bb' 'B'</span></div>
+            <div class="doc-param"><span class="doc-param-name">scale_type</span><span class="doc-param-desc">'chromatic' 'major' 'minor' 'pentatonic_major' 'pentatonic_minor' 'blues' 'dorian' 'phrygian' 'mixolydian' 'harmonic_minor' 'whole_tone'</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('rewind()')">
+            rewind(beats=None)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Move cursor back. <b>rewind()</b> → go to 0:00. <b>rewind(2)</b> → back 2 beats.</div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('set_time(0)')">
+            set_time(beats)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Jump cursor to absolute beat position. Use to overlay drums on a melody on the same track.</div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('note(\"A4\")')">
+            note(name) → step
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Convert a note name to a chromatic step number.
+            <div class="doc-param"><span class="doc-param-name">note('C4')</span><span class="doc-param-desc">→ 0</span></div>
+            <div class="doc-param"><span class="doc-param-name">note('G4')</span><span class="doc-param-desc">→ 7</span></div>
+            <div class="doc-param"><span class="doc-param-name">note('C5')</span><span class="doc-param-desc">→ 12</span></div>
+            <div class="doc-param"><span class="doc-param-name">note('A3')</span><span class="doc-param-desc">→ −3 (below C4)</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('strum([0,2,4,7], H)')">
+            strum(steps, duration=1, velocity=90, gap=0.04)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Strum a chord — notes staggered by <b>gap</b> seconds for a realistic guitar feel.
+            <div class="doc-param"><span class="doc-param-name">gap</span><span class="doc-param-desc">seconds between strikes. 0.04 s = natural strum, 0 = simultaneous</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet(&quot;arpeggio([0,2,4,7], S, style='updown', repeats=2)&quot;)">
+            arpeggio(steps, note_duration=0.25, style='up', repeats=1)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Arpeggiate a chord. style: <b>'up'</b> · <b>'down'</b> · <b>'updown'</b> · <b>'downup'</b> · <b>'random'</b>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('echo(0, Q, times=3, decay=0.55, gap_beats=0.5)')">
+            echo(step, duration, velocity, times=3, decay=0.55, gap_beats=0.5)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Play a note + fading echoes. <b>decay</b> = velocity multiplier per echo (0.5 = halves each time).
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('trill(0, 1, total_duration=H)')">
+            trill(step_a, step_b, total_duration=1, note_duration=0.125)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Rapidly alternate two notes for an ornamental trill effect.</div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('transpose(7)')">
+            transpose(semitones)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Shift all subsequent notes. <b>transpose(12)</b>=+1 oct · <b>transpose(-12)</b>=−1 oct · <b>transpose(0)</b>=reset.
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('humanize(timing=0.02, velocity=10)')">
+            humanize(timing=0.02, velocity=10)
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">
+            Add subtle randomness so music feels played by a human, not a sequencer.
+            <div class="doc-param"><span class="doc-param-name">timing</span><span class="doc-param-desc">max random timing offset in seconds (20 ms is barely perceptible)</span></div>
+            <div class="doc-param"><span class="doc-param-name">velocity</span><span class="doc-param-desc">max random loudness variation ±N</span></div>
+          </div>
+        </div>
+
+        <div class="doc-fn">
+          <div class="doc-fn-sig" onclick="insertSnippet('current_beat()')">
+            current_beat() / get_bpm()
+            <span class="insert-hint">↑ insert</span>
+          </div>
+          <div class="doc-fn-body">Read the cursor position in beats, or current BPM. Useful for <b>print()</b> debugging.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Duration constants -->
+    <div class="doc-section" id="sec-durations">
+      <div class="doc-section-hdr open" onclick="toggleSection(this)">
+        Duration constants <span class="arrow">▶</span>
+      </div>
+      <div class="doc-body open" id="body-durations">
+        <div style="font-size:.71rem;color:var(--muted2);margin-bottom:.3rem">
+          Pass these to <b>play_note</b>, <b>play_chord</b>, or <b>rest</b>.
+        </div>
+        <table class="note-table">
+          <thead><tr><th>Constant</th><th>Short</th><th>Beats</th></tr></thead>
+          <tbody>
+            <tr><td>whole_note</td><td>W</td><td>4</td></tr>
+            <tr><td>dotted_whole</td><td></td><td>6</td></tr>
+            <tr><td>half_note</td><td>H</td><td>2</td></tr>
+            <tr><td>dotted_half</td><td></td><td>3</td></tr>
+            <tr><td>quarter_note</td><td>Q</td><td>1</td></tr>
+            <tr><td>dotted_quarter</td><td></td><td>1.5</td></tr>
+            <tr><td>eighth_note</td><td>E</td><td>0.5</td></tr>
+            <tr><td>dotted_eighth</td><td></td><td>0.75</td></tr>
+            <tr><td>sixteenth_note</td><td>S</td><td>0.25</td></tr>
+            <tr><td>thirty_second</td><td></td><td>0.125</td></tr>
+            <tr><td>triplet_quarter</td><td></td><td>0.667</td></tr>
+            <tr><td>triplet_eighth</td><td></td><td>0.333</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Note reference -->
+    <div class="doc-section" id="sec-notes">
+      <div class="doc-section-hdr" onclick="toggleSection(this)">
+        Note → step (chromatic) <span class="arrow">▶</span>
+      </div>
+      <div class="doc-body" id="body-notes">
+        <div style="font-size:.71rem;color:var(--muted2);margin-bottom:.3rem">
+          Steps are always <b>relative to the root</b> you set in the toolbar.<br>
+          Root=C → step 0=C4. Root=A → step 0=A4.
+        </div>
+        <table class="note-table">
+          <thead><tr><th>Step</th><th>From C4</th><th>Interval</th></tr></thead>
+          <tbody>
+            <tr><td>-12</td><td>C3</td><td>Root −1 oct</td></tr>
+            <tr><td>-11</td><td>Db3</td><td>b2 −1 oct</td></tr>
+            <tr><td>0</td><td>C4</td><td>Root (1)</td></tr>
+            <tr><td>1</td><td>Db4</td><td>b2</td></tr>
+            <tr><td>2</td><td>D4</td><td>2nd</td></tr>
+            <tr><td>3</td><td>Eb4</td><td>b3</td></tr>
+            <tr><td>4</td><td>E4</td><td>3rd</td></tr>
+            <tr><td>5</td><td>F4</td><td>4th</td></tr>
+            <tr><td>6</td><td>Gb4</td><td>b5 (tritone)</td></tr>
+            <tr><td>7</td><td>G4</td><td>5th</td></tr>
+            <tr><td>8</td><td>Ab4</td><td>b6</td></tr>
+            <tr><td>9</td><td>A4</td><td>6th</td></tr>
+            <tr><td>10</td><td>Bb4</td><td>b7</td></tr>
+            <tr><td>11</td><td>B4</td><td>7th</td></tr>
+            <tr><td>12</td><td>C5</td><td>Root +1 oct</td></tr>
+          </tbody>
+        </table>
+        <div style="font-size:.71rem;color:var(--muted2);margin-top:.4rem">
+          In <b>major scale</b> mode degrees are: 0 1 2 3 4 5 6 (7 wraps to next octave root).
+        </div>
+      </div>
+    </div>
+
+    <!-- Time model -->
+    <div class="doc-section" id="sec-time">
+      <div class="doc-section-hdr" onclick="toggleSection(this)">
+        Time model <span class="arrow">▶</span>
+      </div>
+      <div class="doc-body" id="body-time">
+        <div style="font-size:.72rem;color:var(--muted2);line-height:1.7">
+          <b style="color:var(--text)">All durations are in beats.</b><br>
+          Internally converted to seconds: <code style="color:var(--cyan-l)">sec = beats × (60 / bpm)</code><br><br>
+          At BPM 120: 1 beat = 0.5 s · 4 beats (whole note) = 2 s<br>
+          At BPM 60 : 1 beat = 1.0 s · 4 beats = 4 s<br><br>
+          <b style="color:var(--text)">Cursor rules:</b><br>
+          • <span style="color:var(--gold-l)">play_note</span> / <span style="color:var(--gold-l)">play_chord</span> / <span style="color:var(--gold-l)">rest</span> → advance cursor<br>
+          • <span style="color:var(--gold-l)">play_drum</span> → overlay at cursor, does NOT advance<br>
+          • <span style="color:var(--gold-l)">rewind()</span> → jump to 0 · <span style="color:var(--gold-l)">rewind(n)</span> → back n beats<br>
+          • <span style="color:var(--gold-l)">set_time(n)</span> → jump to beat n<br><br>
+          <b style="color:var(--text)">Multi-track:</b> each track has its own independent cursor. Arm multiple tracks to play them simultaneously.
+        </div>
+      </div>
+    </div>
+
+    <!-- Examples -->
+    <div class="doc-section" id="sec-examples">
+      <div class="doc-section-hdr open" onclick="toggleSection(this)">
+        Examples <span class="arrow">▶</span>
+      </div>
+      <div class="doc-body open" id="body-examples">
+
+        <div class="example-card">
+          <div class="example-hdr">Scale run
+            <button class="example-insert" onclick="insertExample(0)">Use</button>
+          </div>
+          <div class="example-code" id="ex0">set_bpm(120)
+for i in range(8):
+    play_note(i, eighth_note)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Chord progression
+            <button class="example-insert" onclick="insertExample(1)">Use</button>
+          </div>
+          <div class="example-code" id="ex1">set_bpm(90)
+set_instrument('piano')
+for root in [0, -3, -5, -2]:
+    play_chord([root, root+2, root+4], half_note)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Drums + melody (same track)
+            <button class="example-insert" onclick="insertExample(2)">Use</button>
+          </div>
+          <div class="example-code" id="ex2">set_bpm(120)
+melody = [0, 2, 4, 2, 0, -3, 0, 2]
+for i, step in enumerate(melody):
+    if i % 2 == 0:
+        play_drum(0)   # kick on even beats
+    else:
+        play_drum(1)   # snare on odd
+    play_note(step, Q)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Loop + variation
+            <button class="example-insert" onclick="insertExample(3)">Use</button>
+          </div>
+          <div class="example-code" id="ex3">set_bpm(110)
+set_instrument('pluck')
+pattern = [0, 4, 7, 4]
+for repeat in range(4):
+    for step in pattern:
+        vel = 110 if repeat == 3 else 75
+        play_note(step, S, velocity=vel)
+    rest(Q)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Drum groove (Track 2)
+            <button class="example-insert" onclick="insertExample(4)">Use</button>
+          </div>
+          <div class="example-code" id="ex4">set_bpm(120)
+for beat in range(8):
+    play_drum(0) if beat % 4 == 0 else None
+    play_drum(1) if beat % 4 == 2 else None
+    play_drum(2)          # hi-hat every beat
+    rest(Q)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Named notes + rewind
+            <button class="example-insert" onclick="insertExample(5)">Use</button>
+          </div>
+          <div class="example-code" id="ex5">set_bpm(100)
+motif = [note('E4'), note('G4'), note('A4'), note('G4')]
+for step in motif:
+    play_note(step, E)
+rewind(len(motif) * 0.5)
+set_instrument('pad')
+play_chord([0, 4, 7], half_note, velocity=55)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Strum + arpeggio
+            <button class="example-insert" onclick="insertExample(6)">Use</button>
+          </div>
+          <div class="example-code" id="ex6">set_bpm(100)
+set_instrument('pluck')
+for root in [0, -3, -5, -2]:
+    strum([root, root+2, root+4, root+7], H, gap=0.05)
+    arpeggio([root, root+4, root+7], S, style='updown')</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Beethoven 5th — EDM remix
+            <button class="example-insert" onclick="insertExample(7)">Use</button>
+          </div>
+          <div class="example-code" id="ex7"># Beethoven Symphony No.5 — first motif, EDM style
+set_bpm(138)
+humanize(timing=0.008, velocity=6)
+
+# The famous 3-short-1-long motif in Eb minor (public domain)
+motif = [note('G4'), note('G4'), note('G4'), note('Eb4')]
+
+set_instrument('synth')
+for repeat in range(4):
+    for i, n in enumerate(motif):
+        dur = whole_note if i == 3 else eighth_note
+        vel = 110 if i == 3 else 95
+        play_note(n, dur, velocity=vel)
+    if repeat < 3:
+        rest(E)
+
+# Second phrase: F minor answer
+answer = [note('F4'), note('F4'), note('F4'), note('D4')]
+for i, n in enumerate(answer):
+    dur = dotted_half if i == 3 else E
+    play_note(n, dur, velocity=100 if i == 3 else 90)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Echo + trill
+            <button class="example-insert" onclick="insertExample(8)">Use</button>
+          </div>
+          <div class="example-code" id="ex8">set_bpm(90)
+set_instrument('piano')
+set_scale('A', 'minor')
+echo(0, Q, velocity=100, times=3, decay=0.5, gap_beats=Q)
+rest(W)
+trill(4, 5, total_duration=H, note_duration=S)
+rest(Q)
+play_chord([0, 2, 4], H, velocity=80)</div>
+        </div>
+
+        <div class="example-card">
+          <div class="example-hdr">Transpose modulation
+            <button class="example-insert" onclick="insertExample(9)">Use</button>
+          </div>
+          <div class="example-code" id="ex9">set_bpm(120)
+set_instrument('synth')
+set_scale('C', 'pentatonic_minor')
+phrase = [0, 1, 2, 4, 3, 1, 0]
+for semitone_shift in [0, 5, 7, 12]:
+    transpose(semitone_shift)
+    for step in phrase:
+        play_note(step, E)
+    rest(Q)
+transpose(0)</div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /docs-panel -->
+
+  <!-- ── Center ── -->
+  <div class="center-col">
+    <div class="tracks-area" id="tracksArea">
+      <!-- tracks injected by JS -->
+    </div>
+    <div class="roll-wrap">
+      <div class="roll-label">Piano Roll</div>
+      <canvas id="pianoRoll"></canvas>
+    </div>
+  </div>
+
+  <!-- ── Console ── -->
+  <div class="console-panel">
+    <div class="console-hdr">
+      Console
+      <button class="console-clear" onclick="clearConsole()">Clear</button>
+    </div>
+    <div class="console-body" id="consoleBody">
+      <div class="con-line con-info">Pad ready · Ctrl+Enter to run active track</div>
+    </div>
+    <div class="stats-bar">
+      <div class="stat-item">
+        <div class="stat-value" id="statNotes">—</div>
+        <div class="stat-label">Notes</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="statDrums">—</div>
+        <div class="stat-label">Drums</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="statDur">—</div>
+        <div class="stat-label">Duration</div>
+      </div>
+      <div class="stat-item">
+        <div class="stat-value" id="statBPM">—</div>
+        <div class="stat-label">BPM</div>
+      </div>
+    </div>
+  </div>
+
+</div><!-- /layout -->
+
+<div class="toast" id="toast"></div>
+
+<!-- Monaco loader -->
+<script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs/loader.js"></script>
+
+<script>
+// ═══════════════════════════════════════════════════════════════════
+// AUDIO ENGINE (Tone.js)
+// ═══════════════════════════════════════════════════════════════════
+const PIANO_BASE = "{% static 'Piano/' %}";
+const NOTE_NAMES_FLAT = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+
+function midiToTone(midi){
+  const oct = Math.floor(midi / 12) - 1;
+  return NOTE_NAMES_FLAT[midi % 12] + oct;
+}
+
+// Effects chain
+const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.22 }).toDestination();
+reverb.generate().catch(() => {});
+const chorus = new Tone.Chorus(3.5, 2, 0.4).connect(reverb).start();
+
+// Piano sampler
+let samplerReady = false;
+const pianoSampler = new Tone.Sampler({
+  urls: {
+    C2:'Piano.pp.C2.wav', E2:'Piano.pp.E2.wav', A2:'Piano.pp.A2.wav',
+    C3:'Piano.pp.C3.wav', E3:'Piano.pp.E3.wav', A3:'Piano.pp.A3.wav',
+    C4:'Piano.pp.C4.wav', E4:'Piano.pp.E4.wav', A4:'Piano.pp.A4.wav',
+    C5:'Piano.pp.C5.wav', E5:'Piano.pp.E5.wav', A5:'Piano.pp.A5.wav',
+    C6:'Piano.pp.C6.wav',
+  },
+  baseUrl: PIANO_BASE,
+  release: 1.5,
+  onload: () => { samplerReady = true; log('Piano samples loaded', 'info'); },
+  onerror: () => log('Piano samples failed — using synth fallback', 'stat'),
+}).connect(reverb);
+
+// Synth (warm AM)
+const synthPoly = new Tone.PolySynth(Tone.Synth, {
+  oscillator: { type: 'sine' },
+  envelope: { attack: 0.02, decay: 0.15, sustain: 0.5, release: 1.8 },
+  volume: -6,
+}).connect(chorus);
+
+// Pad
+const padPoly = new Tone.PolySynth(Tone.Synth, {
+  oscillator: { type: 'triangle' },
+  envelope: { attack: 0.7, decay: 0.2, sustain: 0.8, release: 3 },
+  volume: -8,
+}).connect(reverb);
+
+// Pluck
+const pluckSynth = new Tone.PluckSynth({
+  attackNoise: 2, dampening: 3200, resonance: 0.97, volume: -5,
+}).connect(reverb);
+
+// Bass
+const bassPoly = new Tone.PolySynth(Tone.Synth, {
+  oscillator: { type: 'triangle' },
+  envelope: { attack: 0.01, decay: 0.35, sustain: 0.45, release: 0.6 },
+  volume: -3,
+}).toDestination();
+
+// Drums
+const kick = new Tone.MembraneSynth({
+  pitchDecay: 0.05, octaves: 7,
+  envelope: { attack: 0.001, decay: 0.35, sustain: 0, release: 0.1 }, volume: -4,
+}).toDestination();
+const snare = new Tone.NoiseSynth({
+  noise: { type: 'white' },
+  envelope: { attack: 0.001, decay: 0.18, sustain: 0, release: 0.05 }, volume: -9,
+}).toDestination();
+const hihat = new Tone.MetalSynth({
+  frequency: 400, envelope: { attack: 0.001, decay: 0.08, release: 0.01 },
+  harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -16,
+}).toDestination();
+const openhat = new Tone.MetalSynth({
+  frequency: 400, envelope: { attack: 0.001, decay: 0.5, release: 0.1 },
+  harmonicity: 5.1, modulationIndex: 32, resonance: 4000, octaves: 1.5, volume: -18,
+}).toDestination();
+const clapSynth = new Tone.NoiseSynth({
+  noise: { type: 'pink' },
+  envelope: { attack: 0.001, decay: 0.12, sustain: 0, release: 0.04 }, volume: -10,
+}).connect(reverb);
+const tomSynth = new Tone.MembraneSynth({
+  pitchDecay: 0.08, octaves: 4,
+  envelope: { attack: 0.001, decay: 0.4, sustain: 0, release: 0.15 }, volume: -6,
+}).toDestination();
+
+function triggerNote(instrument, midi, duration, velocity, time){
+  const note = midiToTone(midi);
+  const vel  = velocity / 127;
+  const dur  = duration + 's';
+  switch(instrument){
+    case 'piano':
+      if(samplerReady) pianoSampler.triggerAttackRelease(note, dur, time, vel);
+      else synthPoly.triggerAttackRelease(note, dur, time, vel);
+      break;
+    case 'synth': synthPoly.triggerAttackRelease(note, dur, time, vel); break;
+    case 'pad':   padPoly.triggerAttackRelease(note, dur, time, vel);   break;
+    case 'bass':  bassPoly.triggerAttackRelease(midiToTone(Math.max(0,midi-12)), dur, time, vel); break;
+    case 'pluck': pluckSynth.triggerAttackRelease(note, dur, time, vel); break;
+  }
+}
+
+function triggerDrum(drum, velocity, time){
+  const vel = velocity / 127;
+  switch(drum){
+    case 0: kick.triggerAttackRelease('C1','8n', time, vel); break;
+    case 1: snare.triggerAttackRelease('16n', time, vel); break;
+    case 2: hihat.triggerAttackRelease('32n', time, vel); break;
+    case 3: openhat.triggerAttackRelease('8n', time, vel); break;
+    case 4: clapSynth.triggerAttackRelease('16n', time, vel); break;
+    case 5: tomSynth.triggerAttackRelease('G1','8n', time, vel); break;
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// PIANO ROLL
+// ═══════════════════════════════════════════════════════════════════
+let allEvents = [], totalDuration = 0, rafId = null;
+
+const INST_COLORS = {
+  piano:'#34d399', synth:'#38bdf8', pad:'#a78bfa', bass:'#fbbf24', pluck:'#f472b6'
+};
+const DRUM_COLORS = ['#ef4444','#fbbf24','#60a5fa','#34d399','#f472b6','#c084fc'];
+
+function drawRoll(playhead = -1){
+  const canvas = document.getElementById('pianoRoll');
+  if(!canvas) return;
+  const W = canvas.width, H = canvas.height;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle = '#050a14';
+  ctx.fillRect(0,0,W,H);
+  if(!allEvents.length) return;
+
+  const noteEvs = allEvents.filter(e => e.type==='note');
+  const drumEvs = allEvents.filter(e => e.type==='drum');
+  const drumH = drumEvs.length ? 22 : 0;
+  const noteH = H - drumH;
+  const T = totalDuration || 1;
+
+  // Grid — octave boundaries
+  if(noteEvs.length){
+    const midi = noteEvs.map(e=>e.note);
+    const lo = Math.floor((Math.min(...midi) - 3) / 12) * 12;
+    const hi = Math.ceil((Math.max(...midi) + 3) / 12) * 12;
+    const range = hi - lo;
+    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.lineWidth = 1;
+    for(let n = lo; n <= hi; n += 12){
+      const y = noteH - ((n - lo) / range) * noteH;
+      ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
+    }
+    // Notes
+    noteEvs.forEach(e => {
+      const x = (e.time / T) * W;
+      const w = Math.max(2, (e.duration / T) * W - 1);
+      const y = noteH - ((e.note - lo) / range) * noteH;
+      const h = Math.max(3, noteH / range - 1);
+      ctx.fillStyle = (INST_COLORS[e.instrument] || '#34d399') + 'cc';
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(x, y - h/2, w, h, 2) : ctx.rect(x, y - h/2, w, h);
+      ctx.fill();
+    });
+  }
+
+  // Drums
+  drumEvs.forEach(e => {
+    const x = (e.time / T) * W;
+    ctx.fillStyle = DRUM_COLORS[e.drum % 6];
+    ctx.fillRect(x, H - drumH + 2, 2.5, drumH - 4);
+  });
+
+  // Drum label separator
+  if(drumH){
+    ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(0, H - drumH); ctx.lineTo(W, H - drumH); ctx.stroke();
+  }
+
+  // Playhead
+  if(playhead >= 0 && playhead <= T){
+    const px = (playhead / T) * W;
+    ctx.strokeStyle = 'rgba(255,255,255,0.7)';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4,3]);
+    ctx.beginPath(); ctx.moveTo(px,0); ctx.lineTo(px,H); ctx.stroke();
+    ctx.setLineDash([]);
+  }
+}
+
+function startRollAnim(){
+  if(rafId) cancelAnimationFrame(rafId);
+  const tick = () => {
+    if(Tone.Transport.state === 'started'){
+      drawRoll(Tone.Transport.seconds);
+      rafId = requestAnimationFrame(tick);
+    } else {
+      drawRoll(-1);
+    }
+  };
+  rafId = requestAnimationFrame(tick);
+}
+
+function resizeRoll(){
+  const canvas = document.getElementById('pianoRoll');
+  if(!canvas) return;
+  canvas.width  = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  drawRoll(-1);
+}
+
+window.addEventListener('resize', resizeRoll);
+setTimeout(resizeRoll, 100);
+
+// ═══════════════════════════════════════════════════════════════════
+// TRACK SYSTEM
+// ═══════════════════════════════════════════════════════════════════
+let tracks = [];   // [{id, editor, armed, instrument}]
+let trackCounter = 0;
+
+// ═══════════════════════════════════════════════════════════════════
+// SESSION PERSISTENCE
+// ═══════════════════════════════════════════════════════════════════
+const STATE_KEY = 'octave_pad_v1';
+let _saveTimer;
+
+function saveState(){
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(() => {
+    try {
+      localStorage.setItem(STATE_KEY, JSON.stringify({
+        bpm:   document.getElementById('bpmInput').value,
+        root:  document.getElementById('rootSel').value,
+        scale: document.getElementById('scaleSel').value,
+        tracks: tracks.map(t => ({
+          code:       t.editor?.getValue() || '',
+          instrument: t.instrument,
+          armed:      t.armed,
+        })),
+      }));
+    } catch(e){}
+  }, 600);
+}
+
+function loadState(){
+  try { return JSON.parse(localStorage.getItem(STATE_KEY) || 'null'); }
+  catch(e){ return null; }
+}
+
+function clearSession(){
+  localStorage.removeItem(STATE_KEY);
+  showToast('Session cleared — reload to reset', 'info');
+}
+
+const DEFAULT_CODES = [
+`# Track 1 · Melody
+set_bpm(120)
+set_instrument('piano')
+
+melody = [0, 2, 4, 2, 0, -3, 0, 2, 4, 7, 4, 2]
+for step in melody:
+    play_note(step, E)`,
+
+`# Track 2 · Drums
+for beat in range(24):
+    play_drum(0) if beat % 4 == 0 else None
+    play_drum(1) if beat % 4 == 2 else None
+    play_drum(2)
+    rest(E)`,
+];
+
+require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.44.0/min/vs' } });
+
+function addTrack(opts = ''){
+  const isStr = typeof opts === 'string';
+  const defaultCode = isStr ? opts : (opts.code || '');
+  const id = ++trackCounter;
+  const armed = isStr ? true : (opts.armed !== undefined ? opts.armed : true);
+  const inst = isStr ? (id === 2 ? 'synth' : 'piano') : (opts.instrument || (id === 2 ? 'synth' : 'piano'));
+
+  const card = document.createElement('div');
+  card.className = 'track-card';
+  card.id = `track-card-${id}`;
+  card.innerHTML = `
+    <div class="track-hdr">
+      <button class="arm-btn armed" id="arm-${id}" onclick="toggleArm(${id})" title="Arm/disarm track">REC</button>
+      <span class="track-label">TRACK ${id}</span>
+      <select class="track-inst-sel" id="inst-${id}" onchange="updateInst(${id},this.value)">
+        <option value="piano" ${inst==='piano'?'selected':''}>🎹 Piano</option>
+        <option value="synth" ${inst==='synth'?'selected':''}>🎛 Synth</option>
+        <option value="pad"   ${inst==='pad'  ?'selected':''}>🌊 Pad</option>
+        <option value="bass"  ${inst==='bass' ?'selected':''}>🎸 Bass</option>
+        <option value="pluck" ${inst==='pluck'?'selected':''}>🪕 Pluck</option>
+      </select>
+      ${id > 1 ? `<button class="track-remove" onclick="removeTrack(${id})" title="Remove track">✕</button>` : ''}
+    </div>
+    <div class="editor-wrap">
+      <div class="editor-container" id="editor-${id}"></div>
+      <div class="resize-handle" data-track="${id}" onmousedown="startResize(event,${id})"></div>
+    </div>`;
+
+  document.getElementById('tracksArea').insertBefore(card, document.getElementById('addTrackBtn'));
+
+  require(['vs/editor/editor.main'], () => {
+    if(!monaco.languages.getEncodedLanguageId('python-pad')){
+      monaco.languages.registerCompletionItemProvider('python', {
+        provideCompletionItems: () => ({
+          suggestions: [
+            { label:'play_note',   kind:2, insertText:'play_note(${1:0}, ${2:Q})',                insertTextRules:4, documentation:'step or note name string. step 0=root, 12=octave up.' },
+            { label:'play_chord',  kind:2, insertText:'play_chord([${1:0, 2, 4}], ${2:H})',        insertTextRules:4 },
+            { label:'play_drum',   kind:2, insertText:'play_drum(${1:0})',                          insertTextRules:4, documentation:'0=kick 1=snare 2=hihat 3=openhat 4=clap 5=tom' },
+            { label:'strum',       kind:2, insertText:'strum([${1:0, 2, 4, 7}], ${2:H}, gap=${3:0.04})', insertTextRules:4, documentation:'Strum chord notes slightly staggered.' },
+            { label:'arpeggio',    kind:2, insertText:"arpeggio([${1:0, 2, 4}], ${2:S}, style='${3:up}', repeats=${4:2})", insertTextRules:4 },
+            { label:'echo',        kind:2, insertText:'echo(${1:0}, ${2:Q}, velocity=${3:90}, times=${4:3}, decay=${5:0.55}, gap_beats=${6:Q})', insertTextRules:4 },
+            { label:'trill',       kind:2, insertText:'trill(${1:0}, ${2:1}, total_duration=${3:H})', insertTextRules:4 },
+            { label:'rest',        kind:2, insertText:'rest(${1:Q})',                               insertTextRules:4 },
+            { label:'set_bpm',     kind:2, insertText:'set_bpm(${1:120})',                          insertTextRules:4 },
+            { label:'set_instrument', kind:2, insertText:"set_instrument('${1:piano}')",            insertTextRules:4 },
+            { label:'set_scale',   kind:2, insertText:"set_scale('${1:C}', '${2:major}')",          insertTextRules:4 },
+            { label:'transpose',   kind:2, insertText:'transpose(${1:0})',                          insertTextRules:4 },
+            { label:'humanize',    kind:2, insertText:'humanize(timing=${1:0.02}, velocity=${2:10})', insertTextRules:4 },
+            { label:'rewind',      kind:2, insertText:'rewind()',                                   insertTextRules:4 },
+            { label:'set_time',    kind:2, insertText:'set_time(${1:0})',                           insertTextRules:4 },
+            { label:'note',        kind:2, insertText:"note('${1:C4}')",                            insertTextRules:4, documentation:'Convert note name to chromatic step.' },
+            { label:'current_beat',kind:2, insertText:'current_beat()',                             insertTextRules:4 },
+            { label:'get_bpm',     kind:2, insertText:'get_bpm()',                                  insertTextRules:4 },
+            ...['whole_note','half_note','quarter_note','eighth_note','sixteenth_note',
+                'dotted_whole','dotted_half','dotted_quarter','dotted_eighth',
+                'triplet_quarter','triplet_eighth','thirty_second',
+                'W','H','Q','E','S'].map(c => ({label:c, kind:20, insertText:c})),
+          ]
+        })
+      });
+    }
+
+    const ed = monaco.editor.create(document.getElementById(`editor-${id}`), {
+      value: defaultCode || '',
+      language: 'python',
+      theme: 'vs-dark',
+      fontSize: 13,
+      lineHeight: 20,
+      fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      padding: { top: 10, bottom: 10 },
+      lineNumbers: 'on',
+      renderLineHighlight: 'line',
+      cursorBlinking: 'smooth',
+      smoothScrolling: true,
+      tabSize: 4,
+      insertSpaces: true,
+    });
+
+    ed.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, () => runAll());
+    ed.onDidChangeModelContent(() => saveState());
+
+    tracks.push({ id, editor: ed, armed, instrument: inst });
+    saveState();
+  });
+}
+
+function toggleArm(id){
+  const t = tracks.find(t => t.id === id);
+  if(!t) return;
+  t.armed = !t.armed;
+  const btn = document.getElementById(`arm-${id}`);
+  btn.classList.toggle('armed', t.armed);
+  saveState();
+}
+
+function updateInst(id, val){
+  const t = tracks.find(t => t.id === id);
+  if(t){ t.instrument = val; saveState(); }
+}
+
+function removeTrack(id){
+  const t = tracks.find(t => t.id === id);
+  if(t && t.editor) t.editor.dispose();
+  tracks = tracks.filter(t => t.id !== id);
+  document.getElementById(`track-card-${id}`)?.remove();
+  saveState();
+}
+
+// Resize handle
+let _resizing = null;
+function startResize(e, id){
+  e.preventDefault();
+  _resizing = { id, startY: e.clientY, startH: document.getElementById(`editor-${id}`).offsetHeight };
+  document.addEventListener('mousemove', onResizeMove);
+  document.addEventListener('mouseup', () => {
+    _resizing = null;
+    document.removeEventListener('mousemove', onResizeMove);
+  }, { once: true });
+}
+function onResizeMove(e){
+  if(!_resizing) return;
+  const h = Math.max(80, _resizing.startH + (e.clientY - _resizing.startY));
+  document.getElementById(`editor-${_resizing.id}`).style.height = h + 'px';
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// RUN / STOP
+// ═══════════════════════════════════════════════════════════════════
+function getCsrf(){
+  return document.cookie.match(/csrftoken=([^;]+)/)?.[1] || '';
+}
+
+async function runAll(){
+  await Tone.start();
+  stopAll();
+
+  const payload = {
+    bpm: parseFloat(document.getElementById('bpmInput').value) || 120,
+    root: document.getElementById('rootSel').value,
+    scale: document.getElementById('scaleSel').value,
+    tracks: tracks.map(t => ({
+      code: t.editor?.getValue() || '',
+      armed: t.armed,
+      instrument: t.instrument,
+    })),
+  };
+
+  setStatus('running');
+  document.getElementById('runBtn').disabled = true;
+
+  let data;
+  try {
+    const res = await fetch('{% url "pad:run_code" %}', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrf() },
+      body: JSON.stringify(payload),
+    });
+    data = await res.json();
+  } catch(e){
+    setStatus('err');
+    logErr('Network error: ' + e.message);
+    document.getElementById('runBtn').disabled = false;
+    return;
+  }
+
+  document.getElementById('runBtn').disabled = false;
+
+  if(data.error){
+    setStatus('err');
+    logErr(data.error);
+    return;
+  }
+
+  const events = data.events || [];
+  allEvents = events;
+
+  if(!events.length){
+    setStatus('err');
+    logErr('No events generated. Check your code.');
+    return;
+  }
+
+  // Output from print()
+  (data.output || []).forEach(line => log(line, 'print'));
+
+  // Stats
+  const notes = events.filter(e => e.type==='note').length;
+  const drums = events.filter(e => e.type==='drum').length;
+  const last  = events[events.length - 1];
+  totalDuration = last ? last.time + last.duration + 0.3 : 1;
+
+  document.getElementById('statNotes').textContent = notes;
+  document.getElementById('statDrums').textContent = drums;
+  document.getElementById('statDur').textContent   = totalDuration.toFixed(1) + 's';
+  document.getElementById('statBPM').textContent   = (data.bpm || 120).toFixed(0);
+
+  log(`▶ ${notes} notes · ${drums} drums · ${totalDuration.toFixed(1)}s`, 'ok');
+  drawRoll(-1);
+
+  // Schedule playback
+  Tone.Transport.cancel();
+  Tone.Transport.stop();
+  Tone.Transport.position = 0;
+
+  events.forEach(ev => {
+    if(ev.type === 'note'){
+      Tone.Transport.schedule(t => triggerNote(ev.instrument, ev.note, ev.duration, ev.velocity, t), ev.time);
+    } else if(ev.type === 'drum'){
+      Tone.Transport.schedule(t => triggerDrum(ev.drum, ev.velocity, t), ev.time);
+    }
+  });
+
+  Tone.Transport.schedule(() => { setStatus('ok'); }, totalDuration);
+  Tone.Transport.start();
+  startRollAnim();
+  setStatus('running');
+}
+
+function stopAll(){
+  Tone.Transport.stop();
+  Tone.Transport.cancel();
+  if(rafId){ cancelAnimationFrame(rafId); rafId = null; }
+  drawRoll(-1);
+  setStatus('idle');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════════════════
+function setStatus(s){
+  const el = document.getElementById('statusPill');
+  el.className = 'status-pill ' + s;
+  if(s === 'running') el.innerHTML = '<span class="pulse"></span> playing';
+  else if(s === 'ok')  el.innerHTML = '✓ done';
+  else if(s === 'err') el.innerHTML = '✕ error';
+  else el.textContent = 'idle';
+}
+
+function log(msg, cls='stat'){
+  const body = document.getElementById('consoleBody');
+  const div = document.createElement('div');
+  div.className = `con-line con-${cls}`;
+  div.textContent = msg;
+  body.appendChild(div);
+  body.scrollTop = body.scrollHeight;
+}
+function logErr(msg){ log('✕ ' + msg, 'err'); }
+function clearConsole(){
+  document.getElementById('consoleBody').innerHTML = '';
+}
+
+function showToast(msg, type='info'){
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.className = `toast toast-${type} show`;
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+function insertSnippet(code){
+  const active = tracks[0];
+  if(!active?.editor) return;
+  const ed = active.editor;
+  const pos = ed.getPosition();
+  ed.executeEdits('insert', [{ range: new monaco.Range(pos.lineNumber, pos.column, pos.lineNumber, pos.column), text: code }]);
+  ed.focus();
+  showToast('Inserted: ' + code.slice(0, 30), 'info');
+}
+
+function insertExample(idx){
+  const codes = [
+    `set_bpm(120)\nfor i in range(8):\n    play_note(i, eighth_note)`,
+    `set_bpm(90)\nset_instrument('piano')\nfor root in [0, -3, -5, -2]:\n    play_chord([root, root+2, root+4], half_note)`,
+    `set_bpm(120)\nmelody = [0, 2, 4, 2, 0, -3, 0, 2]\nfor i, step in enumerate(melody):\n    if i % 2 == 0:\n        play_drum(0)\n    else:\n        play_drum(1)\n    play_note(step, Q)`,
+    `set_bpm(110)\nset_instrument('pluck')\npattern = [0, 4, 7, 4]\nfor repeat in range(4):\n    for step in pattern:\n        vel = 110 if repeat == 3 else 75\n        play_note(step, S, velocity=vel)\n    rest(Q)`,
+    `set_bpm(120)\nfor beat in range(8):\n    play_drum(0) if beat % 4 == 0 else None\n    play_drum(1) if beat % 4 == 2 else None\n    play_drum(2)\n    rest(Q)`,
+    `set_bpm(100)\nmotif = [note('E4'), note('G4'), note('A4'), note('G4')]\nfor step in motif:\n    play_note(step, E)\nrewind(len(motif) * 0.5)\nset_instrument('pad')\nplay_chord([0, 4, 7], half_note, velocity=55)`,
+    `set_bpm(100)\nset_instrument('pluck')\nfor root in [0, -3, -5, -2]:\n    strum([root, root+2, root+4, root+7], H, gap=0.05)\n    arpeggio([root, root+4, root+7], S, style='updown')`,
+    `# Beethoven Symphony No.5 — EDM remix (public domain)\nset_bpm(138)\nhumanize(timing=0.008, velocity=6)\nmotif = [note('G4'), note('G4'), note('G4'), note('Eb4')]\nset_instrument('synth')\nfor repeat in range(4):\n    for i, n in enumerate(motif):\n        dur = whole_note if i == 3 else eighth_note\n        vel = 110 if i == 3 else 95\n        play_note(n, dur, velocity=vel)\n    if repeat < 3:\n        rest(E)\nanswer = [note('F4'), note('F4'), note('F4'), note('D4')]\nfor i, n in enumerate(answer):\n    play_note(n, dotted_half if i == 3 else E, velocity=100 if i == 3 else 90)`,
+    `set_bpm(90)\nset_instrument('piano')\nset_scale('A', 'minor')\necho(0, Q, velocity=100, times=3, decay=0.5, gap_beats=Q)\nrest(W)\ntrill(4, 5, total_duration=H, note_duration=S)\nrest(Q)\nplay_chord([0, 2, 4], H, velocity=80)`,
+    `set_bpm(120)\nset_instrument('synth')\nset_scale('C', 'pentatonic_minor')\nphrase = [0, 1, 2, 4, 3, 1, 0]\nfor semitone_shift in [0, 5, 7, 12]:\n    transpose(semitone_shift)\n    for step in phrase:\n        play_note(step, E)\n    rest(Q)\ntranspose(0)`,
+  ];
+  const t = tracks[0];
+  if(!t?.editor) return;
+  t.editor.setValue(codes[idx] || '');
+  t.editor.focus();
+  showToast('Example loaded', 'info');
+}
+
+// Docs accordion
+function toggleSection(hdr){
+  const body = hdr.nextElementSibling;
+  const open = body.classList.toggle('open');
+  hdr.classList.toggle('open', open);
+}
+
+// Doc search
+function filterDocs(q){
+  q = q.toLowerCase();
+  document.querySelectorAll('.doc-fn').forEach(fn => {
+    fn.style.display = fn.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+  document.querySelectorAll('.example-card').forEach(c => {
+    c.style.display = c.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// INIT
+// ═══════════════════════════════════════════════════════════════════
+require(['vs/editor/editor.main'], () => {
+  const addBtn = document.createElement('button');
+  addBtn.id = 'addTrackBtn';
+  addBtn.className = 'add-track-btn';
+  addBtn.textContent = '+ Add Track';
+  addBtn.onclick = () => { if(tracks.length < 4) addTrack(''); else showToast('Max 4 tracks', 'err'); };
+  document.getElementById('tracksArea').appendChild(addBtn);
+
+  // Restore previous session or load defaults
+  const saved = loadState();
+  if(saved && saved.tracks && saved.tracks.length){
+    document.getElementById('bpmInput').value  = saved.bpm   || 120;
+    document.getElementById('rootSel').value   = saved.root  || 'C';
+    document.getElementById('scaleSel').value  = saved.scale || 'chromatic';
+    saved.tracks.forEach(t => addTrack(t));
+    log('Session restored from last visit', 'info');
+  } else {
+    DEFAULT_CODES.forEach(code => addTrack(code));
+  }
+
+  // Save on topbar changes
+  ['bpmInput','rootSel','scaleSel'].forEach(id => {
+    document.getElementById(id).addEventListener('change', saveState);
+  });
+});
+</script>
+</body>
+</html>

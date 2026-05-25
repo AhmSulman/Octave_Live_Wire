@@ -207,6 +207,9 @@ nav{
 /* Card 4 – Backing */
 .card-backing::before{background:linear-gradient(135deg,rgba(217,119,6,.15),rgba(190,24,93,.12))}
 .card-backing:hover{box-shadow:0 30px 60px rgba(217,119,6,.25),0 0 0 1px rgba(251,191,36,.3)}
+/* Card 5 – Pad */
+.card-pad::before{background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(167,139,250,.12))}
+.card-pad:hover{box-shadow:0 30px 60px rgba(109,40,217,.3),0 0 0 1px rgba(167,139,250,.4)}
 
 .card-icon-wrap{
   width:64px;height:64px;border-radius:18px;
@@ -217,6 +220,7 @@ nav{
 .card-piano .card-icon-wrap{background:linear-gradient(135deg,rgba(190,24,93,.3),rgba(217,119,6,.3))}
 .card-guitar .card-icon-wrap{background:linear-gradient(135deg,rgba(5,150,105,.3),rgba(8,145,178,.3))}
 .card-backing .card-icon-wrap{background:linear-gradient(135deg,rgba(217,119,6,.3),rgba(190,24,93,.2))}
+.card-pad .card-icon-wrap{background:linear-gradient(135deg,rgba(109,40,217,.4),rgba(167,139,250,.25))}
 
 .card-tag{
   font-size:.7rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;
@@ -226,6 +230,7 @@ nav{
 .card-piano .card-tag{background:rgba(190,24,93,.2);color:var(--pink-light)}
 .card-guitar .card-tag{background:rgba(5,150,105,.2);color:var(--green-light)}
 .card-backing .card-tag{background:rgba(217,119,6,.2);color:var(--gold-light)}
+.card-pad .card-tag{background:rgba(109,40,217,.25);color:var(--purple-light)}
 
 .card-title{
   font-family:'Orbitron',sans-serif;
@@ -256,6 +261,7 @@ nav{
 .card-piano .launch-text{color:var(--pink-light)}
 .card-guitar .launch-text{color:var(--green-light)}
 .card-backing .launch-text{color:var(--gold-light)}
+.card-pad .launch-text{color:var(--purple-light)}
 .launch-arrow{font-size:1.2rem;transition:transform .3s}
 .app-card:hover .launch-arrow{transform:translateX(6px)}
 
@@ -384,6 +390,7 @@ footer span{
     <a href="{% url 'backing_track_creator:piano_learner' %}">Piano</a>
     <a href="{% url 'backing_track_creator:guitar_fretboard' %}">Guitar</a>
     <a href="{% url 'backing_track_creator:backing_track' %}">Studio</a>
+    <a href="{% url 'pad:pad' %}">Pad</a>
   </div>
 </nav>
 
@@ -394,7 +401,7 @@ footer span{
     <span class="line1">OCTAVE</span>
     <span class="line2">LIVE WIRE</span>
   </h1>
-  <p class="hero-sub">Four professional-grade music tools in one studio. Analyze, learn, visualize, and create — all in your browser.</p>
+  <p class="hero-sub">Five professional-grade music tools in one studio. Analyze, learn, visualize, create, and code music — all in your browser.</p>
   <a href="#apps" class="hero-cta">Explore the Suite ↓</a>
   <div class="scroll-indicator">
     <span>Scroll</span>
@@ -405,7 +412,7 @@ footer span{
 <!-- Stats -->
 <div class="stats-bar">
   <div class="stats-inner">
-    <div class="stat"><div class="stat-num">4</div><div class="stat-label">Music Tools</div></div>
+    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Music Tools</div></div>
     <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Piano Notes</div></div>
     <div class="stat"><div class="stat-num">6</div><div class="stat-label">Guitar Tunings</div></div>
     <div class="stat"><div class="stat-num">5</div><div class="stat-label">Genres</div></div>
@@ -527,6 +534,30 @@ footer span{
       </div>
       <div class="card-launch">
         <span class="launch-text">Open Studio</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
+    <!-- 5 · Pad — Python Music Coding -->
+    <a href="{% url 'pad:pad' %}" class="app-card card-pad">
+      <div class="card-icon-wrap">💻</div>
+      <div class="card-tag">Coder</div>
+      <div class="card-preview" style="padding:10px 14px;align-items:flex-start;flex-direction:column;gap:5px;font-family:monospace;font-size:.68rem;color:rgba(167,139,250,.85)">
+        <span style="color:rgba(100,116,139,.7)"># Python music editor</span>
+        <span><span style="color:#a78bfa">set_bpm</span><span style="color:#e2e8f0">(138)</span></span>
+        <span><span style="color:#a78bfa">play_note</span><span style="color:#e2e8f0">(1, Q)</span></span>
+        <span><span style="color:#a78bfa">strum</span><span style="color:#e2e8f0">([1,3,5], H)</span></span>
+      </div>
+      <h3 class="card-title">Pad</h3>
+      <p class="card-desc">Code music in Python. Multi-track sequencer with real piano samples, scale modes, creative functions, and live piano roll.</p>
+      <div class="card-features">
+        <span class="feature-chip">Python Editor</span>
+        <span class="feature-chip">Multi-Track</span>
+        <span class="feature-chip">Piano Roll</span>
+        <span class="feature-chip">4 Instruments</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Open Pad</span>
         <span class="launch-arrow">→</span>
       </div>
     </a>

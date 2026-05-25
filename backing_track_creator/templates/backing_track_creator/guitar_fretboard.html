@@ -1,3 +1,4 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -278,6 +279,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
           <option value="minor">Natural Minor</option>
           <option value="blues">Blues</option>
           <option value="dorian">Dorian</option>
+          <option value="phrygian">Phrygian</option>
           <option value="mixolydian">Mixolydian</option>
           <option value="none">No Scale</option>
         </select>
@@ -364,13 +366,21 @@ const SCALE_INTERVALS = {
   minor:[0,2,3,5,7,8,10],
   blues:[0,3,5,6,7,10],
   dorian:[0,2,3,5,7,9,10],
+  phrygian:[0,1,3,5,7,8,10],
   mixolydian:[0,2,4,5,7,9,10],
   none:[],
 };
 const INTERVAL_NAMES = {0:'R',2:'2',3:'b3',4:'3',5:'4',6:'b5',7:'5',8:'b6',9:'6',10:'b7',11:'7'};
 
+const PIANO_BASE = "{% static 'Piano/' %}";
+
 let fretboardData = null;
 let audioCtx = null;
+
+// noteId → AudioBuffer (ready to play)
+const pianoBuffers = new Map();
+// noteId → ArrayBuffer (fetched, awaiting AudioContext to decode)
+const pianoRaw = new Map();
 
 function noteToMidi(noteStr){
   const flat = noteStr.replace('#','').trim();
@@ -381,27 +391,99 @@ function noteToMidi(noteStr){
 }
 function midiToFreq(m){ return 440 * Math.pow(2,(m-69)/12); }
 
-function playFretTone(noteStr){
-  if(!audioCtx) audioCtx = new (window.AudioContext||window.webkitAudioContext)();
+// Stage 1 — fetch WAV bytes in the background, no AudioContext needed
+async function fetchPianoSamples(noteIds){
+  const fresh = noteIds.filter(id => !pianoRaw.has(id) && !pianoBuffers.has(id));
+  if(!fresh.length) return;
+  await Promise.allSettled(fresh.map(async id => {
+    try {
+      const r = await fetch(PIANO_BASE + `Piano.pp.${id}.wav`);
+      if(r.ok) pianoRaw.set(id, await r.arrayBuffer());
+    } catch(_){}
+  }));
+}
+
+// Stage 2 — decode fetched ArrayBuffers once AudioContext exists (called on first click)
+async function decodePending(){
+  if(!audioCtx || !pianoRaw.size) return;
+  for(const [id, ab] of [...pianoRaw]){
+    try {
+      pianoBuffers.set(id, await audioCtx.decodeAudioData(ab));
+      pianoRaw.delete(id);
+    } catch(_){}
+  }
+}
+
+// Find a decoded buffer in a nearby octave for pitch-shifting when exact note is absent
+function nearestBuffer(noteStr){
+  const m = noteStr.match(/^([A-G]b?)(\d+)$/);
+  if(!m) return null;
+  const [, name, oct] = m;
+  const o = parseInt(oct);
+  for(let d = 1; d <= 4; d++){
+    for(const sign of [1, -1]){
+      const candidate = name + (o + sign * d);
+      if(pianoBuffers.has(candidate)) return { buf: pianoBuffers.get(candidate), semitones: sign * d * 12 };
+    }
+  }
+  return null;
+}
+
+function playSampleBuf(buf, semitoneOffset = 0){
+  const src = audioCtx.createBufferSource();
+  src.buffer = buf;
+  if(semitoneOffset) src.playbackRate.value = Math.pow(2, semitoneOffset / 12);
+  const gain = audioCtx.createGain();
+  gain.gain.setValueAtTime(0.75, audioCtx.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 3);
+  src.connect(gain); gain.connect(audioCtx.destination);
+  src.start();
+}
+
+function playOscillatorFallback(noteStr){
   const midi = noteToMidi(noteStr);
   const freq = midiToFreq(midi);
-
   const masterGain = audioCtx.createGain();
   masterGain.connect(audioCtx.destination);
   masterGain.gain.setValueAtTime(0, audioCtx.currentTime);
-  masterGain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.02);
-  masterGain.gain.exponentialRampToValueAtTime(0.15, audioCtx.currentTime + 0.3);
-  masterGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.8);
-
-  [[1,.8,'sawtooth'],[2,.35,'sine'],[3,.15,'sine'],[4,.08,'sine']].forEach(([r,a,t])=>{
+  masterGain.gain.linearRampToValueAtTime(0.35, audioCtx.currentTime + 0.01);
+  masterGain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 1.5);
+  [[1,.7,'triangle'],[2,.15,'sine']].forEach(([r,a,t])=>{
     const o = audioCtx.createOscillator();
     const g = audioCtx.createGain();
-    o.type = t; o.frequency.value = freq * r;
-    g.gain.value = a;
+    o.type = t; o.frequency.value = freq * r; g.gain.value = a;
     o.connect(g); g.connect(masterGain);
-    o.start(audioCtx.currentTime);
-    o.stop(audioCtx.currentTime + 2);
+    o.start(); o.stop(audioCtx.currentTime + 2);
   });
+}
+
+function playFretTone(noteStr){
+  if(!audioCtx){
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    decodePending(); // async, doesn't block
+  }
+  if(audioCtx.state === 'suspended') audioCtx.resume();
+
+  // Best case: exact decoded buffer
+  if(pianoBuffers.has(noteStr)){ playSampleBuf(pianoBuffers.get(noteStr)); return; }
+
+  // Note was fetched but not yet decoded — decode it now and play immediately
+  const raw = pianoRaw.get(noteStr);
+  if(raw){
+    audioCtx.decodeAudioData(raw.slice(0)).then(decoded => {
+      pianoBuffers.set(noteStr, decoded);
+      pianoRaw.delete(noteStr);
+      playSampleBuf(decoded);
+    }).catch(() => playOscillatorFallback(noteStr));
+    return;
+  }
+
+  // No file for this note — pitch-shift from nearest available octave
+  const near = nearestBuffer(noteStr);
+  if(near){ playSampleBuf(near.buf, near.semitones); return; }
+
+  // Ultimate fallback: synthetic oscillator
+  playOscillatorFallback(noteStr);
 }
 
 async function loadFretboard(){
@@ -421,6 +503,10 @@ async function loadFretboard(){
     updateStringInfo();
     applyScale();
     showToast(`Loaded: ${fretboardData.tuning}`, 'success');
+
+    // Background-fetch WAV samples for every note on this fretboard
+    const noteIds = [...new Set(fretboardData.strings.flatMap(s => s.frets.map(f => f.note)))];
+    fetchPianoSamples(noteIds);
   } catch(e){
     wrap.innerHTML = `<div style="padding:2rem;color:#ef4444">Error: ${e.message}</div>`;
   }
@@ -552,7 +638,7 @@ function applyScale(){
   // Scale name tag
   const scaleNames = {
     pentatonic_minor:'Pentatonic Minor',pentatonic_major:'Pentatonic Major',
-    major:'Major',minor:'Natural Minor',blues:'Blues',dorian:'Dorian',mixolydian:'Mixolydian',none:'No Scale'
+    major:'Major',minor:'Natural Minor',blues:'Blues',dorian:'Dorian',phrygian:'Phrygian',mixolydian:'Mixolydian',none:'No Scale'
   };
   document.getElementById('scaleTag').textContent = `${root} ${scaleNames[type] || ''}`;
 
