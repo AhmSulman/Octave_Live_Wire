@@ -832,7 +832,7 @@ const reverb = new Tone.Reverb({ decay: 2.5, wet: 0.22 }).toDestination();
 reverb.generate().catch(() => {});
 const chorus = new Tone.Chorus(3.5, 2, 0.4).connect(reverb).start();
 
-// Piano sampler — explicit {% static %} URLs so WhiteNoise hashed paths resolve correctly
+// Piano sampler — explicit static URLs so WhiteNoise hashed paths resolve correctly
 let samplerReady = false;
 const pianoSampler = new Tone.Sampler({
   urls: {
