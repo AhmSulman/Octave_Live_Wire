@@ -383,6 +383,10 @@ details.help ol b{color:var(--text)}
       </div>
 
       <div class="toggle-row">
+        <div><div class="t-lbl">Wait for my cue</div><div class="t-sub">The band holds until it hears you, then drops in</div></div>
+        <label class="switch"><input type="checkbox" id="waitOn" checked><span class="slider-sw"></span></label>
+      </div>
+      <div class="toggle-row">
         <div><div class="t-lbl">Metronome</div><div class="t-sub">Click track on every beat</div></div>
         <label class="switch"><input type="checkbox" id="metroOn"><span class="slider-sw"></span></label>
       </div>
@@ -503,6 +507,8 @@ const $ = id => document.getElementById(id);
 // ---- shared musical state -------------------------------------------------
 const state = {
   playing:false,
+  armed:false,             // "playing" pressed but waiting to hear the player's cue
+  waitForMe:true,          // band holds until it hears you, then drops in
   micOn:false,
   recording:false,
   bpm:96,
@@ -969,6 +975,13 @@ function detectLoop(){
     }
     state.heardPC = pc;
   }
+
+  // armed and waiting for a cue: your first solid note drops the band in
+  if(state.armed && stableCount>=2){
+    if(state.rootMode==='follow') state.heardPC = pc;   // start in the key you hit
+    beginPlaying();
+    setStatus('Locked in — jam on!');
+  }
   drawViz();
 }
 
@@ -1105,17 +1118,31 @@ function updateNow(root, quality){
 }
 
 // play / stop
+function beginPlaying(){
+  // actually fire the transport (called immediately, or once your cue is heard)
+  state.armed=false;
+  if(state.rootMode==='manual') state.lockedRoot=state.manualRoot;
+  $('playBtn').classList.add('playing');
+  $('playBtn').innerHTML='■ <span id="playLabel">Stop</span>';
+  startTransport();
+}
 $('playBtn').addEventListener('click', async ()=>{
   await Tone.start();
-  if(!state.playing){
+  if(!state.playing && !state.armed){
     state.playing=true;
-    $('playBtn').classList.add('playing');
-    $('playBtn').innerHTML='■ <span id="playLabel">Stop</span>';
-    if(state.rootMode==='manual') state.lockedRoot=state.manualRoot;
-    startTransport();
-    setStatus(state.micOn ? 'Jamming — play your guitar!' : 'Jamming. Enable the mic to make the bass follow you, or use Manual key.');
+    if(state.waitForMe && state.micOn){
+      // arm and listen — your groove triggers the band
+      state.armed=true;
+      $('playBtn').classList.add('playing');
+      $('playBtn').innerHTML='◐ <span id="playLabel">Listening…</span>';
+      setStatus('Listening… start playing and the band drops in with you.');
+    } else {
+      if(state.waitForMe && !state.micOn) setStatus('Enable the mic so your playing can cue the band — starting now instead.');
+      beginPlaying();
+    }
   } else {
-    state.playing=false;
+    // stop (whether armed-and-waiting or actually playing)
+    state.playing=false; state.armed=false;
     $('playBtn').classList.remove('playing');
     $('playBtn').innerHTML='▶ <span id="playLabel">Start Jam</span>';
     stopTransport();
@@ -1159,6 +1186,7 @@ $('quality').addEventListener('click', e=>{const b=e.target.closest('button'); i
 $('rootMode').addEventListener('click', e=>{const b=e.target.closest('button'); if(b) setRootMode(b.dataset.m);});
 $('sens').addEventListener('input', e=>{ state.sensitivity=+e.target.value; $('sensVal').textContent=sensNames[state.sensitivity]; });
 $('drumsOn').addEventListener('change', e=>state.drums=e.target.checked);
+$('waitOn').addEventListener('change', e=>state.waitForMe=e.target.checked);
 $('metroOn').addEventListener('change', e=>state.metro=e.target.checked);
 $('latchOn').addEventListener('change', e=>state.latch=e.target.checked);
 // drummer controls

@@ -25,7 +25,7 @@ class BassistViewTests(TestCase):
             'id="cmdInput"', 'id="quickCmds"', 'id="bandLog"',
             'id="strings"', 'id="tunerMode"', 'id="tuneStatus"',
             'id="detNote"', 'id="needle"', 'id="levelFill"',
-            'id="recBtn"', 'id="recList"',
+            'id="recBtn"', 'id="recList"', 'id="waitOn"',
         ):
             self.assertIn(hook, body, f"missing UI hook: {hook}")
 
