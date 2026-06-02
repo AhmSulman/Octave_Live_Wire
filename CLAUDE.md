@@ -44,7 +44,7 @@ The `build_files.sh` script runs during Vercel build: it installs requirements t
 
 ### Django App Structure
 
-There are three Django apps: `backing_track_creator` (four music tools), `pad` (Python music coding environment), and `bassist` (a live, mic-following bass + drum jam tool). The project config package is `octave_live_wire/`.
+There are two Django apps: `backing_track_creator` (four music tools) and `pad` (Python music coding environment). The project config package is `octave_live_wire/`.
 
 ```text
 octave_live_wire/          # Django project config (settings, urls, wsgi, asgi)
@@ -64,12 +64,6 @@ pad/                       # Python music coding environment (TunePad-inspired)
   urls.py                  # app_name = "pad"; "" → pad_view, "run/" → run_code
   templates/pad/
     pad.html               # Full Pad UI: Monaco editor, multi-track, piano roll
-bassist/                   # Live "Bassist Bot" jam tool (mic-following band)
-  views.py                 # bassist_view (serves the SPA; all audio is client-side)
-  urls.py                  # app_name = "bassist"; "" → bassist_view
-  tests.py                 # render + UI-hook smoke tests
-  templates/bassist/
-    bassist.html           # Full UI: mic pitch detection, generative bass + drums, tuner, recorder
 DrumsSample/               # Drum sample audio files served as static assets
 Piano/                     # Piano sample WAV files (Piano.pp.<Note><Octave>.wav)
 staticfiles/               # Output of collectstatic — do not edit directly
@@ -88,7 +82,6 @@ staticfiles/               # Output of collectstatic — do not edit directly
 | `/api/fretboard/` | `get_fretboard_data` (GET) | backing_track_creator | — |
 | `/api/compose/` | `auto_compose` (POST) | backing_track_creator | — |
 | `/pad/` | `pad_view` | pad | `pad.html` |
-| `/bassist/` | `bassist_view` | bassist | `bassist.html` |
 | `/pad/run/` | `run_code` (POST) | pad | — |
 
 ### Audio Analysis Pipeline (`/api/analyze/`)

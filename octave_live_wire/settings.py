@@ -49,7 +49,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "backing_track_creator",
     "pad",
-    "bassist",
 ]
 
 # ── Middleware ────────────────────────────────────────────────────────────────
