@@ -867,32 +867,51 @@ function stopTransport(){
 // ===========================================================================
 //  4. MIC PITCH DETECTION  (autocorrelation / ACF2+)
 // ===========================================================================
-let analyser=null, micStream=null, micSource=null, detectBuf=null, rafId=null, lastDetect=0;
+let analyser=null, micStream=null, micSource=null, micSink=null, detectBuf=null, byteBuf=null, rafId=null, lastDetect=0, micSampleRate=44100;
 let stableCount=0, stablePC=null;
 let lastIntervals=[];   // recent root-relative intervals for major/minor guessing
 
 async function enableMic(){
   try{
+    if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+      setStatus('This browser can’t access the mic. Use the latest Chrome or Safari, over https.', true); return;
+    }
     micStream = await navigator.mediaDevices.getUserMedia({audio:{
       echoCancellation:false, noiseSuppression:false, autoGainControl:false
     }});
-    // Reuse Tone's AudioContext — iOS limits the number of contexts and needs a
-    // user-gesture resume (Tone.start() is called before enableMic).
-    const ctx = Tone.context;
-    micSource = ctx.createMediaStreamSource(micStream);
-    analyser = ctx.createAnalyser();
+    await Tone.start();
+    // Use the underlying AudioContext (the one Tone drives) for all mic nodes.
+    const raw = (Tone.context && Tone.context.rawContext) ? Tone.context.rawContext : Tone.context;
+    if(raw.state !== 'running'){ try{ await raw.resume(); }catch(e){} }
+    micSampleRate = raw.sampleRate || 44100;
+    micSource = raw.createMediaStreamSource(micStream);
+    analyser = raw.createAnalyser();
     analyser.fftSize = 2048;
     analyser.smoothingTimeConstant = 0;
     detectBuf = new Float32Array(analyser.fftSize);
-    micSource.connect(analyser);              // to the analyser only — never to output (no feedback)
+    byteBuf   = new Uint8Array(analyser.fftSize);
+    micSource.connect(analyser);
+    // iOS Safari only pulls audio through an AnalyserNode if the graph reaches
+    // the destination — otherwise getXTimeDomainData() returns all zeros and
+    // detection silently does nothing. Route through a SILENT gain to fix that.
+    micSink = raw.createGain(); micSink.gain.value = 0;
+    analyser.connect(micSink); micSink.connect(raw.destination);
     if(state.recording){ try{ micSource.connect(recDest); micPatched=true; }catch(e){} }  // capture guitar if already recording
     state.micOn=true;
     $('micBtn').classList.add('on');
     $('micBtn').innerHTML='<span class="dot"></span> Mic Live';
-    setStatus('Mic is live — play a note to test detection.');
+    setStatus('Mic is live — play a note. Nothing showing? Raise “Mic sensitivity”.');
     detectLoop();
   }catch(e){
-    setStatus('Could not access the mic: '+((e&&e.message)||e), true);
+    const n=e&&e.name;
+    const msg = (n==='NotAllowedError'||n==='SecurityError')
+        ? 'Mic permission was blocked. Allow microphone access for this site in your browser settings, then tap Enable Mic again.'
+      : (n==='NotFoundError'||n==='OverconstrainedError')
+        ? 'No usable microphone was found on this device.'
+      : (n==='NotReadableError')
+        ? 'The mic is busy in another app. Close other apps using it and try again.'
+      : 'Could not access the mic: '+((e&&e.message)||e);
+    setStatus(msg, true);
   }
 }
 
@@ -904,7 +923,7 @@ async function enableMic(){
 function autoCorrelate(buf, sampleRate){
   const SIZE=buf.length;
   let rms=0; for(let i=0;i<SIZE;i++){const v=buf[i];rms+=v*v;} rms=Math.sqrt(rms/SIZE);
-  const gate=0.004+state.sensitivity*0.0016;     // sensitivity slider = noise gate
+  const gate=0.0022+state.sensitivity*0.0012;    // sensitivity slider = noise gate (forgiving for quiet phone mics)
   if(rms<gate) return {freq:-1, rms};
 
   const minLag=Math.max(2,Math.floor(sampleRate/1200));
@@ -939,8 +958,9 @@ function detectLoop(){
   rafId = requestAnimationFrame(detectLoop);
   if(!analyser) return;
   const t=performance.now(); if(t-lastDetect<28) return; lastDetect=t;   // ~33 fps cap (mobile-friendly)
-  analyser.getFloatTimeDomainData(detectBuf);
-  const {freq, rms} = autoCorrelate(detectBuf, Tone.context.sampleRate);
+  if(analyser.getFloatTimeDomainData){ analyser.getFloatTimeDomainData(detectBuf); }
+  else { analyser.getByteTimeDomainData(byteBuf); for(let i=0;i<byteBuf.length;i++) detectBuf[i]=(byteBuf[i]-128)/128; }  // older Safari
+  const {freq, rms} = autoCorrelate(detectBuf, micSampleRate);
 
   // level meter
   $('levelFill').style.width = Math.min(100, rms*420)+'%';
@@ -1042,8 +1062,10 @@ function clearTuner(){
 function disableMic(){
   if(rafId) cancelAnimationFrame(rafId); rafId=null;
   if(micSource){ try{ micSource.disconnect(); }catch(e){} micSource=null; }
+  if(analyser){ try{ analyser.disconnect(); }catch(e){} }
+  if(micSink){ try{ micSink.disconnect(); }catch(e){} micSink=null; }
   if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
-  analyser=null;                       // do NOT close Tone.context — playback needs it
+  analyser=null;                       // do NOT close the AudioContext — playback needs it
   state.micOn=false; state.heardPC=null;
   $('levelFill').style.width='0%';
   $('detNote').textContent='—'; $('detNote').classList.add('idle');
