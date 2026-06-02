@@ -1,0 +1,1409 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bassist Bot — Octave Live Wire</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎸</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js"></script>
+<style>
+:root{
+  --bg:#030712; --surface:#0f172a; --glass:rgba(15,23,42,.7);
+  --border:rgba(255,255,255,.08);
+  --amber:#f59e0b; --amber-light:#fbbf24;
+  --orange:#ea580c; --orange-light:#fb923c;
+  --green:#059669; --green-light:#34d399;
+  --red:#dc2626; --cyan-light:#38bdf8;
+  --text:#f1f5f9; --text-muted:#64748b;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{
+  font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);
+  min-height:100vh;overflow-x:hidden;
+}
+a{color:inherit}
+
+/* background */
+.mesh{
+  position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(ellipse 70% 55% at 20% 15%,rgba(234,88,12,.12),transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 85%,rgba(245,158,11,.10),transparent 55%),
+    radial-gradient(ellipse 60% 40% at 60% 60%,rgba(5,150,105,.06),transparent 55%);
+}
+
+/* nav */
+nav{
+  position:sticky;top:0;z-index:50;display:flex;align-items:center;justify-content:space-between;
+  padding:.8rem 1.6rem;background:rgba(3,7,18,.82);backdrop-filter:blur(20px);
+  border-bottom:1px solid var(--border);
+}
+.logo{font-family:'Orbitron';font-weight:900;font-size:1.15rem;letter-spacing:.08em;
+  background:linear-gradient(135deg,var(--amber-light),var(--orange-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+.nav-links{display:flex;gap:1.4rem;font-size:.85rem}
+.nav-links a{color:var(--text-muted);text-decoration:none;transition:color .2s}
+.nav-links a:hover{color:var(--text)}
+
+/* layout */
+.wrap{position:relative;z-index:1;max-width:1280px;margin:0 auto;padding:1.4rem 1.6rem 4rem}
+.app-head{display:flex;align-items:center;gap:.9rem;margin-bottom:1.2rem;flex-wrap:wrap}
+.app-head .ico{font-size:2rem}
+.app-head h1{font-family:'Orbitron';font-size:1.7rem;font-weight:900;letter-spacing:.02em}
+.app-head .sub{color:var(--text-muted);font-size:.9rem}
+.tag{font-size:.65rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  padding:.25rem .7rem;border-radius:999px;background:rgba(234,88,12,.18);color:var(--orange-light)}
+
+.grid{display:grid;grid-template-columns:1.4fr 1fr;gap:1.2rem}
+.subgrid{display:grid;grid-template-columns:1fr 1fr;gap:1.2rem}
+@media(max-width:880px){.grid{grid-template-columns:1fr}.subgrid{grid-template-columns:1fr}}
+
+.panel{
+  background:var(--glass);backdrop-filter:blur(16px);
+  border:1px solid var(--border);border-radius:20px;padding:1.4rem;
+}
+.panel h2{font-family:'Orbitron';font-size:.78rem;font-weight:700;letter-spacing:.14em;
+  text-transform:uppercase;color:var(--text-muted);margin-bottom:1rem}
+
+/* transport */
+.transport{display:flex;align-items:center;gap:1rem;flex-wrap:wrap;margin-bottom:1.2rem}
+.btn-play{
+  display:flex;align-items:center;gap:.6rem;border:none;cursor:pointer;
+  padding:.85rem 1.8rem;border-radius:999px;font-family:'Space Grotesk';
+  font-weight:700;font-size:1rem;letter-spacing:.03em;color:#fff;
+  background:linear-gradient(135deg,var(--orange),var(--amber));
+  box-shadow:0 0 30px rgba(234,88,12,.35);transition:all .25s;
+}
+.btn-play:hover{transform:translateY(-2px);box-shadow:0 0 44px rgba(234,88,12,.5)}
+.btn-play.playing{background:linear-gradient(135deg,var(--red),#b91c1c);box-shadow:0 0 30px rgba(220,38,38,.4)}
+.btn-mic{
+  display:flex;align-items:center;gap:.5rem;border:1px solid var(--border);cursor:pointer;
+  padding:.8rem 1.3rem;border-radius:999px;background:rgba(255,255,255,.04);
+  color:var(--text);font-weight:600;font-size:.9rem;transition:all .2s;
+}
+.btn-mic:hover{border-color:var(--green-light);color:var(--green-light)}
+.btn-mic.on{border-color:var(--green-light);color:var(--green-light);background:rgba(5,150,105,.12)}
+.btn-mic .dot{width:9px;height:9px;border-radius:50%;background:var(--text-muted)}
+.btn-mic.on .dot{background:var(--green-light);box-shadow:0 0 10px var(--green-light);animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+#recBtn.recording{border-color:var(--red);color:#fff;background:rgba(220,38,38,.2);animation:recpulse 1.2s infinite}
+@keyframes recpulse{0%,100%{box-shadow:0 0 0 0 rgba(220,38,38,.55)}50%{box-shadow:0 0 0 9px rgba(220,38,38,0)}}
+
+.rec-list{display:flex;flex-direction:column;gap:.7rem;margin-top:.6rem}
+.rec-item{border:1px solid var(--border);border-radius:12px;padding:.8rem;background:rgba(255,255,255,.03);display:flex;flex-direction:column;gap:.55rem}
+.rec-meta{display:flex;justify-content:space-between;align-items:center;font-weight:600;font-size:.86rem}
+.rec-meta .rec-stamp{color:var(--text-muted);font-weight:400;font-size:.74rem}
+.rec-item audio{width:100%;height:38px}
+.rec-actions{display:flex;gap:1rem;align-items:center}
+.rec-dl{font-size:.8rem;color:var(--amber-light);text-decoration:none;font-weight:600}
+.rec-dl:hover{text-decoration:underline}
+.rec-del{font-size:.8rem;color:var(--text-muted);background:none;border:none;cursor:pointer;font-weight:600}
+.rec-del:hover{color:var(--red)}
+
+.beat-dots{display:flex;gap:.5rem;margin-left:auto}
+.beat-dots .bd{width:14px;height:14px;border-radius:50%;background:rgba(255,255,255,.12);transition:all .08s}
+.beat-dots .bd.lit{background:var(--amber-light);box-shadow:0 0 14px var(--amber-light);transform:scale(1.25)}
+.beat-dots .bd.one.lit{background:var(--orange-light);box-shadow:0 0 16px var(--orange-light)}
+
+/* big detection display */
+.detect{
+  text-align:center;padding:1.4rem 1rem;border-radius:18px;
+  background:linear-gradient(180deg,rgba(0,0,0,.35),rgba(0,0,0,.15));
+  border:1px solid var(--border);margin-bottom:1.2rem;position:relative;overflow:hidden;
+}
+.detect .label{font-size:.7rem;letter-spacing:.16em;text-transform:uppercase;color:var(--text-muted)}
+.detect .note{font-family:'Orbitron';font-size:4.4rem;font-weight:900;line-height:1;margin:.2rem 0;
+  background:linear-gradient(135deg,#fff,var(--orange-light));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  transition:opacity .15s}
+.detect .note.idle{opacity:.25}
+.detect .freq{color:var(--text-muted);font-size:.85rem;font-variant-numeric:tabular-nums}
+
+/* tuner needle */
+.tuner{height:46px;margin:.7rem auto 0;max-width:340px;position:relative}
+.tuner .track{position:absolute;top:50%;left:0;right:0;height:3px;border-radius:2px;
+  background:linear-gradient(90deg,var(--red),rgba(255,255,255,.15) 45%,var(--green-light) 50%,rgba(255,255,255,.15) 55%,var(--red))}
+.tuner .center{position:absolute;left:50%;top:30%;bottom:30%;width:2px;background:var(--green-light);transform:translateX(-50%)}
+.tuner .needle{position:absolute;top:20%;width:4px;height:60%;border-radius:2px;background:var(--amber-light);
+  left:50%;transform:translateX(-50%);box-shadow:0 0 12px var(--amber-light);transition:left .08s ease-out}
+.tuner .cents{position:absolute;top:100%;left:50%;transform:translateX(-50%);font-size:.7rem;color:var(--text-muted);margin-top:.2rem;font-variant-numeric:tabular-nums}
+
+/* level meter */
+.level{height:8px;border-radius:5px;background:rgba(255,255,255,.06);overflow:hidden;margin-top:1rem}
+.level .fill{height:100%;width:0%;border-radius:5px;
+  background:linear-gradient(90deg,var(--green),var(--amber),var(--red));transition:width .06s}
+
+/* tuner */
+.tuner-panel{margin-top:1.2rem;border:1px solid var(--border);border-radius:14px;background:rgba(0,0,0,.22);padding:.9rem 1rem}
+.tuner-head{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-bottom:.8rem;flex-wrap:wrap}
+.tuner-head span{font-size:.78rem;font-weight:600;color:var(--text-muted);letter-spacing:.04em}
+.seg.mini button{padding:.3rem .6rem;font-size:.74rem;border-radius:8px}
+.strings{display:grid;grid-template-columns:repeat(6,1fr);gap:.4rem}
+.string-pill{text-align:center;padding:.55rem 0;border-radius:10px;border:1px solid var(--border);
+  background:rgba(255,255,255,.03);transition:all .12s}
+.string-pill .sn{font-family:'Orbitron';font-weight:700;font-size:1.05rem;line-height:1}
+.string-pill .so{font-size:.6rem;color:var(--text-muted);margin-top:.15rem}
+.string-pill.near{border-color:var(--amber-light);background:rgba(245,158,11,.12);color:var(--amber-light)}
+.string-pill.intune{border-color:var(--green-light);background:rgba(5,150,105,.18);color:var(--green-light);box-shadow:0 0 16px rgba(52,211,153,.3)}
+.tune-status{margin-top:.8rem;text-align:center;font-weight:600;font-size:.92rem;color:var(--text-muted);min-height:1.3em;transition:color .15s}
+.tune-status.intune{color:var(--green-light)}
+.tune-status.flat,.tune-status.sharp{color:var(--amber-light)}
+
+/* now playing */
+.nowbar{display:flex;gap:.8rem;margin-top:1.2rem}
+.nowcard{flex:1;text-align:center;padding:.9rem;border-radius:14px;border:1px solid var(--border);background:rgba(255,255,255,.03)}
+.nowcard .k{font-size:.66rem;letter-spacing:.12em;text-transform:uppercase;color:var(--text-muted)}
+.nowcard .v{font-family:'Orbitron';font-size:1.5rem;font-weight:700;margin-top:.25rem}
+.nowcard .v.bass{color:var(--amber-light)}
+.nowcard .v.chord{color:var(--green-light)}
+.nowcard .v.lock{color:var(--cyan-light);font-size:1rem;margin-top:.5rem}
+
+/* viz canvas */
+.vizwrap{margin-top:1.2rem;border-radius:14px;overflow:hidden;border:1px solid var(--border);background:rgba(0,0,0,.3)}
+#viz{display:block;width:100%;height:120px}
+
+/* controls */
+.ctrl{margin-bottom:1.15rem}
+.ctrl:last-child{margin-bottom:0}
+.ctrl .lbl{display:flex;justify-content:space-between;align-items:center;font-size:.8rem;
+  font-weight:600;color:var(--text);margin-bottom:.5rem}
+.ctrl .lbl .val{color:var(--amber-light);font-variant-numeric:tabular-nums;font-weight:700}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:6px;border-radius:4px;
+  background:rgba(255,255,255,.1);outline:none;cursor:pointer}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;
+  background:var(--amber-light);box-shadow:0 0 10px rgba(251,191,36,.6);cursor:pointer}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:var(--amber-light);cursor:pointer}
+
+.seg{display:flex;flex-wrap:wrap;gap:.4rem}
+.seg button{flex:1 1 auto;min-width:fit-content;border:1px solid var(--border);background:rgba(255,255,255,.03);
+  color:var(--text-muted);padding:.5rem .7rem;border-radius:10px;font-family:'Space Grotesk';
+  font-size:.82rem;font-weight:600;cursor:pointer;transition:all .18s;white-space:nowrap}
+.seg button:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+.seg button.active{background:linear-gradient(135deg,rgba(234,88,12,.25),rgba(245,158,11,.2));
+  border-color:var(--orange-light);color:var(--amber-light)}
+
+select{width:100%;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:10px;padding:.6rem .7rem;font-family:'Space Grotesk';font-size:.85rem;cursor:pointer}
+
+.toggle-row{display:flex;align-items:center;justify-content:space-between;padding:.6rem 0;border-top:1px solid var(--border)}
+.toggle-row .t-lbl{font-size:.85rem;font-weight:600}
+.toggle-row .t-sub{font-size:.72rem;color:var(--text-muted)}
+.switch{position:relative;width:46px;height:26px;flex-shrink:0}
+.switch input{opacity:0;width:0;height:0}
+.slider-sw{position:absolute;inset:0;background:rgba(255,255,255,.12);border-radius:999px;transition:.2s;cursor:pointer}
+.slider-sw:before{content:'';position:absolute;height:20px;width:20px;left:3px;top:3px;background:#fff;border-radius:50%;transition:.2s}
+.switch input:checked+.slider-sw{background:linear-gradient(135deg,var(--orange),var(--amber))}
+.switch input:checked+.slider-sw:before{transform:translateX(20px)}
+
+/* key picker */
+.keys{display:grid;grid-template-columns:repeat(6,1fr);gap:.35rem}
+.keys button{border:1px solid var(--border);background:rgba(255,255,255,.03);color:var(--text-muted);
+  padding:.5rem 0;border-radius:9px;font-weight:700;font-size:.85rem;cursor:pointer;transition:all .15s}
+.keys button:hover{color:var(--text)}
+.keys button.active{background:linear-gradient(135deg,rgba(5,150,105,.3),rgba(52,211,153,.2));border-color:var(--green-light);color:var(--green-light)}
+.keys.disabled{opacity:.4;pointer-events:none}
+
+.hint{font-size:.78rem;color:var(--text-muted);line-height:1.6;margin-top:.6rem}
+.hint b{color:var(--amber-light);font-weight:600}
+
+/* instruct the band */
+.chips{display:flex;flex-wrap:wrap;gap:.45rem;margin-bottom:.9rem}
+.chips button{border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);
+  padding:.45rem .8rem;border-radius:999px;font-family:'Space Grotesk';font-size:.82rem;font-weight:600;
+  cursor:pointer;transition:all .15s}
+.chips button:hover{border-color:var(--amber-light);color:var(--amber-light);transform:translateY(-1px)}
+.chips button:active{transform:translateY(0)}
+.cmd-row{display:flex;gap:.6rem}
+.cmd-row input{flex:1;background:var(--surface);color:var(--text);border:1px solid var(--border);
+  border-radius:12px;padding:.75rem .9rem;font-family:'Space Grotesk';font-size:.9rem;outline:none}
+.cmd-row input:focus{border-color:var(--amber-light)}
+.cmd-row button{border:none;cursor:pointer;padding:.75rem 1.2rem;border-radius:12px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,var(--orange),var(--amber));white-space:nowrap;transition:all .2s}
+.cmd-row button:hover{transform:translateY(-1px);box-shadow:0 0 24px rgba(234,88,12,.4)}
+.band-log{margin-top:.9rem;display:flex;flex-direction:column;gap:.35rem;max-height:140px;overflow-y:auto}
+.band-log .line{font-size:.84rem;line-height:1.4;padding:.35rem .6rem;border-radius:9px;background:rgba(255,255,255,.03);
+  border-left:2px solid var(--amber-light);animation:fadeIn .25s ease}
+.band-log .line .you{color:var(--cyan-light);font-weight:600}
+.band-log .line .band{color:var(--amber-light);font-weight:600}
+.band-log .line.miss{border-left-color:var(--text-muted);opacity:.8}
+@keyframes fadeIn{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}
+
+.status{font-size:.78rem;color:var(--text-muted);margin-top:.8rem;min-height:1.2em}
+.status.err{color:var(--orange-light)}
+
+details.help{margin-top:1.2rem;border:1px solid var(--border);border-radius:14px;background:var(--glass);padding:0 1.2rem}
+details.help summary{cursor:pointer;padding:1rem 0;font-family:'Orbitron';font-size:.78rem;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--text-muted);list-style:none}
+details.help summary::-webkit-details-marker{display:none}
+details.help[open] summary{color:var(--amber-light)}
+details.help ol{margin:0 0 1.2rem 1.2rem;color:var(--text-muted);font-size:.86rem;line-height:1.8}
+details.help ol b{color:var(--text)}
+</style>
+</head>
+<body>
+<div class="mesh"></div>
+
+<nav>
+  <div class="logo">OCTAVE⚡ · BASSIST BOT</div>
+  <div class="nav-links">
+    <a href="{% url 'backing_track_creator:home' %}">Home</a>
+    <a href="{% url 'backing_track_creator:guitar_fretboard' %}">Guitar</a>
+    <a href="{% url 'backing_track_creator:backing_track' %}">Studio</a>
+    <a href="{% url 'pad:pad' %}">Pad</a>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="app-head">
+    <span class="ico">🎸</span>
+    <div>
+      <h1>Bassist Bot</h1>
+      <div class="sub">A bass player that listens to your guitar and locks into the groove with you.</div>
+    </div>
+    <span class="tag" style="margin-left:auto">Live Jam</span>
+  </div>
+
+  <div class="transport">
+    <button class="btn-play" id="playBtn">▶ <span id="playLabel">Start Jam</span></button>
+    <button class="btn-mic" id="micBtn"><span class="dot"></span> Enable Mic</button>
+    <button class="btn-mic" id="recBtn">● <span>Record</span></button>
+    <div class="beat-dots" id="beatDots">
+      <div class="bd one"></div><div class="bd"></div><div class="bd"></div><div class="bd"></div>
+    </div>
+  </div>
+
+  <div class="grid">
+    <!-- LEFT: listening + visuals -->
+    <div class="panel">
+      <h2>What I'm Hearing</h2>
+      <div class="detect">
+        <div class="label">Detected note</div>
+        <div class="note idle" id="detNote">—</div>
+        <div class="freq" id="detFreq">enable the mic and play a note</div>
+        <div class="tuner">
+          <div class="track"></div><div class="center"></div>
+          <div class="needle" id="needle"></div>
+          <div class="cents" id="cents">0 ¢</div>
+        </div>
+        <div class="level"><div class="fill" id="levelFill"></div></div>
+      </div>
+
+      <!-- Tuner -->
+      <div class="tuner-panel">
+        <div class="tuner-head">
+          <span>🎯 Tuner — what the mic hears</span>
+          <div class="seg mini" id="tunerMode">
+            <button data-t="chromatic" class="active">Chromatic</button>
+            <button data-t="guitar">Guitar</button>
+          </div>
+        </div>
+        <div class="strings" id="strings"></div>
+        <div class="tune-status" id="tuneStatus">Enable the mic and play a note — works without starting the jam.</div>
+      </div>
+
+      <div class="nowbar">
+        <div class="nowcard">
+          <div class="k">Bass is playing</div>
+          <div class="v bass" id="nowBass">—</div>
+        </div>
+        <div class="nowcard">
+          <div class="k">Locked chord</div>
+          <div class="v chord" id="nowChord">—</div>
+          <div class="v lock" id="lockMode">follow</div>
+        </div>
+      </div>
+
+      <div class="vizwrap"><canvas id="viz"></canvas></div>
+      <div class="status" id="status">Tip: enable the mic, hit Start Jam, then play single notes or chord roots on your guitar.</div>
+    </div>
+
+    <!-- RIGHT: controls -->
+    <div class="panel">
+      <h2>The Groove</h2>
+
+      <div class="ctrl">
+        <div class="lbl">Tempo <span class="val"><span id="bpmVal">96</span> BPM</span></div>
+        <input type="range" id="bpm" min="50" max="200" value="96">
+        <div style="margin-top:.6rem"><button class="btn-mic" id="tapBtn" style="width:100%;justify-content:center">Tap Tempo</button></div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Bass style</div>
+        <select id="pattern">
+          <option value="rootEighths">Rock — driving 8ths</option>
+          <option value="rootFifth" selected>Root &amp; Fifth — classic</option>
+          <option value="walking">Walking bass — jazzy</option>
+          <option value="octaves">Funk — octave pops</option>
+          <option value="reggae">Reggae — offbeat</option>
+          <option value="ballad">Ballad — held roots</option>
+          <option value="syncopop">Pop — syncopated</option>
+        </select>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Chord color</div>
+        <div class="seg" id="quality">
+          <button data-q="auto" class="active">Auto</button>
+          <button data-q="major">Major</button>
+          <button data-q="minor">Minor</button>
+        </div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Root source</div>
+        <div class="seg" id="rootMode">
+          <button data-m="follow" class="active">Follow my guitar</button>
+          <button data-m="manual">Manual key</button>
+        </div>
+        <div class="keys disabled" id="keyPicker" style="margin-top:.6rem"></div>
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Bass octave <span class="val" id="octVal">low</span></div>
+        <input type="range" id="octave" min="-1" max="2" value="0" step="1">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Bass volume <span class="val"><span id="volVal">80</span>%</span></div>
+        <input type="range" id="vol" min="0" max="100" value="80">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Swing / feel <span class="val"><span id="swingVal">0</span>%</span></div>
+        <input type="range" id="swing" min="0" max="60" value="0">
+      </div>
+
+      <div class="ctrl">
+        <div class="lbl">Mic sensitivity <span class="val" id="sensVal">normal</span></div>
+        <input type="range" id="sens" min="1" max="10" value="4">
+      </div>
+
+      <div class="toggle-row">
+        <div><div class="t-lbl">Metronome</div><div class="t-sub">Click track on every beat</div></div>
+        <label class="switch"><input type="checkbox" id="metroOn"><span class="slider-sw"></span></label>
+      </div>
+      <div class="toggle-row">
+        <div><div class="t-lbl">Latch root</div><div class="t-sub">Hold last chord when you stop playing</div></div>
+        <label class="switch"><input type="checkbox" id="latchOn" checked><span class="slider-sw"></span></label>
+      </div>
+    </div>
+  </div>
+
+  <!-- RECORDINGS -->
+  <div class="panel" style="margin-top:1.2rem">
+    <h2>Session Recordings</h2>
+    <div class="hint" id="recEmpty">Hit <b>● Record</b> in the transport to capture the jam — your guitar (through the mic) plus the bass and drums are mixed into one clip you can play back and download. Recording happens in your browser; nothing is uploaded.</div>
+    <div class="rec-list" id="recList"></div>
+  </div>
+
+  <!-- DRUMMER -->
+  <div class="panel" style="margin-top:1.2rem">
+    <h2>The Drummer</h2>
+    <div class="subgrid">
+      <div>
+        <div class="toggle-row" style="border-top:none;padding-top:0">
+          <div><div class="t-lbl">Drummer</div><div class="t-sub">Play a full kit with the bass</div></div>
+          <label class="switch"><input type="checkbox" id="drumsOn" checked><span class="slider-sw"></span></label>
+        </div>
+
+        <div class="ctrl">
+          <div class="lbl">Drum style</div>
+          <select id="drumStyle">
+            <option value="match" selected>Match the bass</option>
+            <option value="rock">Rock</option>
+            <option value="funk">Funk</option>
+            <option value="jazz">Jazz / Swing</option>
+            <option value="pop">Pop</option>
+            <option value="reggae">Reggae — one drop</option>
+            <option value="ballad">Ballad</option>
+            <option value="hiphop">Hip-Hop — boom bap</option>
+          </select>
+        </div>
+      </div>
+
+      <div>
+        <div class="ctrl">
+          <div class="lbl">Intensity <span class="val" id="intVal">medium</span></div>
+          <input type="range" id="intensity" min="0" max="100" value="50">
+        </div>
+
+        <div class="ctrl">
+          <div class="lbl">Fills</div>
+          <div class="seg" id="fillSel">
+            <button data-f="0">Off</button>
+            <button data-f="2">2 bars</button>
+            <button data-f="4" class="active">4 bars</button>
+            <button data-f="8">8 bars</button>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="lbl">Drum volume <span class="val"><span id="drumVolVal">75</span>%</span></div>
+          <input type="range" id="drumVol" min="0" max="100" value="75">
+        </div>
+      </div>
+    </div>
+    <div class="hint">The drummer locks to the same tempo and swing as the bass. <b>Match the bass</b> picks a kit feel to suit your chosen bass style; or set an independent style. <b>Intensity</b> adds hats, ghost snares and busier cymbals; <b>Fills</b> drop a tom roll + crash on the cycle.</div>
+  </div>
+
+  <!-- INSTRUCT THE BAND -->
+  <div class="panel" style="margin-top:1.2rem">
+    <h2>Instruct the Band</h2>
+    <div class="chips" id="quickCmds">
+      <button data-cmd="give me a fill">🥁 Fill</button>
+      <button data-cmd="crash">💥 Crash</button>
+      <button data-cmd="play busier">🔥 Busier</button>
+      <button data-cmd="calm down">🍃 Calmer</button>
+      <button data-cmd="build up">📈 Build up</button>
+      <button data-cmd="walk it">🚶 Walk it</button>
+      <button data-cmd="play funk">🕺 Funk</button>
+      <button data-cmd="half time">🐢 Half-time</button>
+      <button data-cmd="double time">🐇 Double-time</button>
+      <button data-cmd="swing it">🎷 Swing</button>
+      <button data-cmd="drop the drums">🤫 Drums out</button>
+      <button data-cmd="bring the drums back">🥁 Drums in</button>
+      <button data-cmd="drop the bass">🎸 Bass out</button>
+      <button data-cmd="louder">🔊 Louder</button>
+    </div>
+    <div class="cmd-row">
+      <input type="text" id="cmdInput" placeholder='Tell them what to play — e.g. "walk it in A minor, busier, give me a fill"' autocomplete="off">
+      <button id="cmdSend">Tell them ▸</button>
+    </div>
+    <div class="band-log" id="bandLog"></div>
+    <div class="hint">Try: <b>walking</b>, <b>funk</b>, <b>reggae</b>, <b>rock</b>, <b>jazz</b>, <b>play in E minor</b>, <b>busier / calmer</b>, <b>build up</b>, <b>give me a fill</b>, <b>crash</b>, <b>half-time / double-time</b>, <b>swing it / straight</b>, <b>faster / slower</b>, <b>louder / quieter</b>, <b>more fills / no fills</b>, <b>drop the drums / bass</b>. Chain them with commas.</div>
+  </div>
+
+  <details class="help">
+    <summary>How to jam ▾</summary>
+    <ol>
+      <li><b>Enable the mic</b> and allow access. Use your guitar's pickup into an audio interface, or just play acoustically near the mic.</li>
+      <li>Hit <b>Start Jam</b>. The bassist starts on a count and locks to the BPM you set.</li>
+      <li>In <b>Follow</b> mode, play a note or strum a chord — the bot hears the root and re-roots the bass on the next bar. Play <b>single notes / clear roots</b> for the most reliable tracking.</li>
+      <li>Prefer to drive it yourself? Switch to <b>Manual key</b> and tap a root — the bass vamps there until you change it.</li>
+      <li>Pick a <b>bass style</b> and <b>chord color</b> to match your tune, dial in <b>swing</b>, and turn <b>drums</b> on for a fuller backing.</li>
+      <li><b>Latch</b> keeps the last chord ringing when you pause, so the groove never drops out mid-jam.</li>
+    </ol>
+  </details>
+</div>
+
+<script>
+"use strict";
+// ===========================================================================
+//  BASSIST BOT  — listens via the mic, follows the guitar, plays bass + drums
+//  All audio is client-side: Web Audio (pitch detection) + Tone.js (synthesis)
+// ===========================================================================
+
+const NOTE_NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+const $ = id => document.getElementById(id);
+
+// ---- shared musical state -------------------------------------------------
+const state = {
+  playing:false,
+  micOn:false,
+  recording:false,
+  bpm:96,
+  pattern:'rootFifth',
+  quality:'auto',          // auto | major | minor
+  rootMode:'follow',       // follow | manual
+  manualRoot:0,            // pitch class chosen in manual mode
+  octaveShift:0,           // -1..2
+  volume:0.8,
+  swing:0,                 // 0..0.6
+  sensitivity:4,           // 1..10
+  tunerMode:'chromatic',   // chromatic | guitar  (drives the tuner read-out)
+  bassOn:true,
+  drums:true,
+  drumStyle:'match',       // match | rock | funk | jazz | pop | reggae | ballad | hiphop
+  drumIntensity:0.5,       // 0..1  busyness / ghost notes / cymbal subdivision
+  fillEvery:4,             // fill every N bars (0 = never)
+  metro:false,
+  latch:true,
+  // one-shot / transient instructions handled in the scheduler
+  fillNow:false,           // throw a fill on the next bar
+  crashNow:false,          // hit a crash on the next bar
+  build:null,              // {from,len,pos} active build-up ramp
+  // live-detected info
+  heardPC:null,            // smoothed pitch class currently heard (0-11) or null
+  heardQuality:null,       // 'major' | 'minor' guess from interval history (auto mode)
+  lockedRoot:0,            // pitch class the current bar's bass is built on
+  lockedQuality:'major',
+};
+
+// ===========================================================================
+//  1. AUDIO ENGINE (Tone.js)  — bass synth, drums, metronome
+// ===========================================================================
+const masterVol = new Tone.Volume(0).toDestination();
+const comp = new Tone.Compressor({threshold:-22,ratio:3.5,attack:.01,release:.18}).connect(masterVol);
+// A second tap off the master bus so we can record the whole jam (bass + drums
+// + metronome). The guitar/mic is patched in here too while recording.
+const recDest = Tone.context.createMediaStreamDestination();
+Tone.connect(masterVol, recDest);
+
+// electric-ish bass: monophonic, filtered FM square through a touch of drive
+const bassVol  = new Tone.Volume(-4).connect(comp);
+const bassDrive = new Tone.Distortion(0.08).connect(bassVol);
+const bass = new Tone.MonoSynth({
+  oscillator:{type:'fmsquare', modulationType:'sine', modulationIndex:1.4, harmonicity:1},
+  envelope:{attack:.012, decay:.18, sustain:.55, release:.22},
+  filter:{type:'lowpass', Q:2.5, rolloff:-24},
+  filterEnvelope:{attack:.012, decay:.22, sustain:.35, release:.4, baseFrequency:110, octaves:2.7},
+  volume:0,
+}).connect(bassDrive);
+
+// drum kit  — a full-ish acoustic-style kit synthesised with Tone.js
+const drumVol = new Tone.Volume(-6).connect(comp);
+const kick = new Tone.MembraneSynth({pitchDecay:.045, octaves:6, envelope:{attack:.001,decay:.34,sustain:.01,release:1.1}}).connect(drumVol);
+const snare = new Tone.NoiseSynth({noise:{type:'white'}, envelope:{attack:.001,decay:.16,sustain:0}}).connect(new Tone.Filter(1600,'highpass').connect(drumVol));
+const snareBody = new Tone.MembraneSynth({pitchDecay:.02, octaves:3, envelope:{attack:.001,decay:.12,sustain:0}}).connect(new Tone.Volume(-12).connect(drumVol));
+const hat = new Tone.MetalSynth({frequency:320, envelope:{attack:.001,decay:.045,release:.01}, harmonicity:5.1, modulationIndex:32, resonance:7000, octaves:1.4}).connect(new Tone.Volume(-16).connect(drumVol));
+const openhat = new Tone.MetalSynth({frequency:320, envelope:{attack:.001,decay:.32,release:.12}, harmonicity:5.1, modulationIndex:32, resonance:6000, octaves:1.5}).connect(new Tone.Volume(-18).connect(drumVol));
+const ride = new Tone.MetalSynth({frequency:480, envelope:{attack:.001,decay:.5,release:.2}, harmonicity:3.2, modulationIndex:18, resonance:9000, octaves:1.2}).connect(new Tone.Volume(-22).connect(drumVol));
+const crash = new Tone.MetalSynth({frequency:300, envelope:{attack:.001,decay:1.4,release:.6}, harmonicity:4.5, modulationIndex:48, resonance:5000, octaves:2}).connect(new Tone.Volume(-20).connect(drumVol));
+const toms = [
+  new Tone.MembraneSynth({pitchDecay:.06, octaves:4, envelope:{attack:.001,decay:.3,sustain:0}}).connect(new Tone.Volume(-10).connect(drumVol)),
+  new Tone.MembraneSynth({pitchDecay:.07, octaves:4, envelope:{attack:.001,decay:.32,sustain:0}}).connect(new Tone.Volume(-10).connect(drumVol)),
+  new Tone.MembraneSynth({pitchDecay:.08, octaves:4, envelope:{attack:.001,decay:.34,sustain:0}}).connect(new Tone.Volume(-10).connect(drumVol)),
+];
+const TOM_PITCH=['G2','D2','A1'];
+
+// fires one drum hit by name at a given time
+function hit(inst, when, vel){
+  switch(inst){
+    case 'k':  kick.triggerAttackRelease('C1','8n',when,vel); break;
+    case 's':  snare.triggerAttackRelease('16n',when,vel); snareBody.triggerAttackRelease('A2','16n',when,vel*0.5); break;
+    case 'sg': snare.triggerAttackRelease('32n',when,vel*0.35); break;   // ghost snare
+    case 'h':  hat.triggerAttackRelease('32n',when,vel); break;
+    case 'oh': openhat.triggerAttackRelease('16n',when,vel); break;
+    case 'ride': ride.triggerAttackRelease('32n',when,vel); break;
+    case 'crash': crash.triggerAttackRelease('4n',when,vel); break;
+    case 't0': toms[0].triggerAttackRelease(TOM_PITCH[0],'8n',when,vel); break;
+    case 't1': toms[1].triggerAttackRelease(TOM_PITCH[1],'8n',when,vel); break;
+    case 't2': toms[2].triggerAttackRelease(TOM_PITCH[2],'8n',when,vel); break;
+  }
+}
+
+// metronome click
+const clickVol = new Tone.Volume(-8).connect(masterVol);
+const click = new Tone.MembraneSynth({pitchDecay:.008, octaves:2, envelope:{attack:.001,decay:.05,sustain:0}}).connect(clickVol);
+
+// ---- duration helpers -----------------------------------------------------
+const beatSec = () => 60 / Tone.Transport.bpm.value;
+
+// ===========================================================================
+//  2. GENERATIVE MUSIC ENGINE
+//  Nothing here is a pre-written sequence. A tiny theory core turns a root +
+//  chord quality into chord tones / scale degrees (all by interval math), and
+//  parameterised generators COMPUTE the bass line and drum groove for each bar
+//  from compact "style profiles" — a handful of numbers describing feel,
+//  density and role-mix. Change a number and the part the band plays changes;
+//  there are no note lists to maintain.
+// ===========================================================================
+
+// -- seeded PRNG: a groove stays repeatable, yet can evolve across bars ------
+function mulberry32(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function hashSeed(){let h=2166136261;for(let i=0;i<arguments.length;i++){h^=Math.floor(arguments[i]*1000)|0;h=Math.imul(h,16777619);}return h>>>0;}
+function strHash(s){let h=0;for(let i=0;i<s.length;i++)h=(h*31+s.charCodeAt(i))|0;return h>>>0;}
+const rngOf=(...a)=>mulberry32(hashSeed(...a));
+
+// -- theory: scales as interval sets (definitions, computed per key) ---------
+const SCALES={major:[0,2,4,5,7,9,11],minor:[0,2,3,5,7,8,10],dorian:[0,2,3,5,7,9,10],mixolydian:[0,2,4,5,7,9,10]};
+const scaleFor=q=>q==='minor'?SCALES.minor:SCALES.major;
+// resolve an abstract scale-role to a semitone offset above the chord root
+function roleSemis(role,q,scale,rng){switch(role){
+  case 'root':return 0; case 'fifth':return 7; case 'octave':return 12;
+  case 'third':return q==='minor'?3:4; case 'seventh':return q==='minor'?10:11;
+  case 'sixth':return 9; case 'scale':return scale[Math.floor(rng()*scale.length)];
+  default:return 0;
+}}
+// metric strength of a beat position: strong beats > 8ths > 16ths
+function metricWeight(beat){
+  if(Number.isInteger(beat)) return beat%2===0?1.0:0.85;
+  if(Math.abs((beat%1)-0.5)<1e-9) return 0.55;
+  return 0.32;
+}
+function weightedPick(weights,rng){let t=0;for(const k in weights)t+=weights[k];let r=rng()*t;for(const k in weights){r-=weights[k];if(r<=0)return k;}return 'root';}
+
+// -- BASS profiles: descriptors only (sub=grid in beats, density=fill chance,
+//    roles=tone weights, approach=leading-tone chance on the last slot,
+//    legato=length vs gap, plus optional skipDown / syncopate feel flags) ----
+const BASS_PROFILES={
+  rootEighths:{sub:.5, density:1,   roles:{root:9,fifth:1},                 approach:.12,legato:.9},
+  rootFifth:  {sub:1,  density:1,   roles:{root:3,fifth:2},                 approach:0,  legato:.95},
+  walking:    {sub:1,  density:1,   roles:{root:3,third:2,fifth:2,scale:2}, approach:.9, legato:.95},
+  octaves:    {sub:.25,density:.62, roles:{root:5,octave:4,fifth:1},        approach:.15,legato:.4},
+  reggae:     {sub:.5, density:.55, roles:{root:3,fifth:2},                 approach:0,  legato:.7, skipDown:true,syncopate:true},
+  ballad:     {sub:2,  density:1,   roles:{root:2,fifth:1},                 approach:0,  legato:1},
+  syncopop:   {sub:.25,density:.5,  roles:{root:4,fifth:2,octave:1},        approach:.2, legato:.7, syncopate:true},
+};
+
+// Compute one bar of bass as {beat,semis,dur,vel}. Per-slot RNG is seeded by
+// (style,slot) so the line repeats bar to bar like a real groove, transposed
+// to whatever root the scheduler locks in.
+function generateBass(styleName,quality){
+  const p=BASS_PROFILES[styleName]||BASS_PROFILES.rootFifth;
+  const scale=scaleFor(quality), base=strHash(styleName);
+  const slots=Math.max(1,Math.round(4/p.sub));
+  const ev=[];
+  for(let i=0;i<slots;i++){
+    const beat=i*p.sub, mw=metricWeight(beat);
+    const rng=mulberry32((base^hashSeed(i))>>>0);
+    let place;
+    if(p.skipDown&&beat===0) place=false;
+    else if(p.density>=1)     place=true;
+    else if(p.syncopate)      place=rng()<p.density*(0.6+0.9*(1-mw));   // lean to weak slots
+    else                      place=rng()<p.density*(0.55+0.6*mw);      // lean to strong slots
+    if(!place) continue;
+    let semis;
+    if(i===slots-1 && rng()<p.approach) semis=rng()<0.6?11:10;          // approach toward next root
+    else semis=roleSemis(weightedPick(p.roles,rng),quality,scale,rng);
+    ev.push({beat,semis,vel:0.55+mw*0.4});
+  }
+  for(let i=0;i<ev.length;i++){
+    const next=i+1<ev.length?ev[i+1].beat:4;
+    ev[i].dur=Math.max(0.12,(next-ev[i].beat)*p.legato);
+  }
+  return ev;
+}
+
+// -- DRUM profiles: descriptors only. kick/snare = beats the style leans on
+//    (the engine derives the rest); the cymbal subdivision tightens and ghost
+//    notes / extra kicks appear as intensity rises. inst names match hit().
+const DRUM_PROFILES={
+  rock:  {kick:[0,2],   snare:[1,3], cym:'hat',  cymSub:.5,  ghost:.25,kickAdd:.4, swing:0},
+  funk:  {kick:[0,2.5], snare:[1,3], cym:'hat',  cymSub:.25, ghost:.6, kickAdd:.7, swing:0},
+  jazz:  {kick:[0,2],   snare:[],    cym:'ride', cymSub:.5,  ghost:.4, kickAdd:.2, swing:1, feather:true, compSnare:.45},
+  pop:   {kick:[0,2],   snare:[1,3], cym:'hat',  cymSub:.5,  ghost:.15,kickAdd:.4, swing:0},
+  reggae:{kick:[2],     snare:[2],   cym:'hat',  cymSub:.5,  ghost:.2, kickAdd:.2, swing:0, offCym:true},
+  ballad:{kick:[0],     snare:[2],   cym:'hat',  cymSub:.5,  ghost:.1, kickAdd:.15,swing:0, soft:true},
+  hiphop:{kick:[0,2.5], snare:[1,3], cym:'hat',  cymSub:.5,  ghost:.3, kickAdd:.5, swing:1},
+};
+const BASS_TO_DRUM={rootEighths:'rock',rootFifth:'rock',walking:'jazz',octaves:'funk',reggae:'reggae',ballad:'ballad',syncopop:'pop'};
+const currentDrumStyle=()=>state.drumStyle==='match'?(BASS_TO_DRUM[state.pattern]||'rock'):state.drumStyle;
+
+// Compute one bar of drums as {beat,inst,vel}. Anchors are deterministic;
+// ghosts/extra kicks use a (style,beat) seed (stable groove) while comping uses
+// a (style,bar) seed so it varies bar to bar like a live player.
+function generateDrums(intensity,barIndex){
+  const style=currentDrumStyle(), p=DRUM_PROFILES[style]||DRUM_PROFILES.rock;
+  const base=strHash(style), soft=p.soft?0.7:1, e=[];
+
+  // cymbal layer — subdivision tightens with intensity
+  if(p.cym==='ride'&&p.swing){
+    for(let b=0;b<4;b++){
+      e.push({beat:b,inst:'ride',vel:(b%2?.42:.5)*soft});
+      if(b%2===1||intensity>0.4) e.push({beat:b+0.66,inst:'ride',vel:.36*soft});
+    }
+  } else {
+    const sub=intensity>0.66?p.cymSub/2:p.cymSub;
+    for(let b=0;b<4;b+=sub){
+      const off=Math.abs((b%1)-0.5)<1e-9;
+      if(p.offCym&&!off) continue;                     // reggae: hats only on the off
+      const open=intensity>0.75&&off&&!p.offCym;
+      e.push({beat:b,inst:open?'oh':'h',vel:((b%1===0?.5:.36))*soft});
+    }
+  }
+
+  // kick — anchors plus intensity-driven syncopated adds
+  p.kick.forEach(b=>e.push({beat:b,inst:'k',vel:.9*soft}));
+  if(p.feather){e.push({beat:0,inst:'k',vel:.3});e.push({beat:2,inst:'k',vel:.28});}
+  else for(let b=0;b<4;b+=0.5){
+    if(p.kick.indexOf(b)>=0) continue;
+    const rng=mulberry32((base^hashSeed(b,7))>>>0), off=!Number.isInteger(b);
+    if(rng()<p.kickAdd*intensity*(off?1:0.4)) e.push({beat:b,inst:'k',vel:.6*soft});
+  }
+
+  // snare — backbeat plus ghost notes that fill in as intensity rises
+  p.snare.forEach(b=>e.push({beat:b,inst:'s',vel:.85*soft}));
+  for(let b=0;b<4;b+=0.25){
+    if(p.snare.indexOf(b)>=0) continue;
+    if(Number.isInteger(b)&&p.snare.length) continue;  // keep main beats clear
+    const rng=mulberry32((base^hashSeed(b,13))>>>0);
+    if(rng()<p.ghost*intensity) e.push({beat:b,inst:'sg',vel:.35*soft});
+  }
+  if(p.compSnare){                                     // jazz comping — varies each bar
+    const rng=mulberry32((base^hashSeed(barIndex,17))>>>0);
+    if(rng()<p.compSnare) e.push({beat:1.66,inst:'sg',vel:.4});
+    if(rng()<p.compSnare) e.push({beat:3.66,inst:'sg',vel:.4});
+  }
+  return e;
+}
+
+// Compute a fill: descend through snare→toms over the bar tail, denser and
+// longer with intensity, seeded by the bar so no two fills are identical.
+function generateFill(intensity,barIndex){
+  const voices=['s','t0','t1','t2'];
+  const sub=intensity>0.6?0.25:0.5, start=intensity>0.6?2:3;
+  const rng=mulberry32((strHash('fill')^hashSeed(barIndex))>>>0);
+  const total=Math.max(1,Math.round((4-start)/sub));
+  const e=[]; let n=0;
+  for(let b=start;b<4;b+=sub){
+    const idx=Math.min(voices.length-1,Math.floor((n/total)*voices.length+rng()*0.8));
+    e.push({beat:b,inst:voices[idx],vel:0.6+0.35*(n/Math.max(1,total-1))});
+    n++;
+  }
+  return e;
+}
+
+// ===========================================================================
+//  3. SCHEDULER — one repeating bar callback drives bass + drums; a beat
+//     callback drives the metronome + visual beat dots.
+// ===========================================================================
+let barId=null, beatId=null, beatCount=0, barIndex=0, crashNext=false;
+
+function pcToBassMidi(pc){
+  // Anchor on a C so the pitch class is correct: 36 = C2. pc 0..11 -> C2..B2,
+  // then shift by whole octaves. (Anchoring on 28=E1 would mis-map the names.)
+  return 36 + pc + 12*state.octaveShift;
+}
+
+function scheduleBar(time){
+  // Lock this bar's chord from whatever we're hearing / manual selection
+  let root, quality;
+  if(state.rootMode==='manual'){
+    root = state.manualRoot;
+  } else {
+    if(state.heardPC!=null) root = state.heardPC;
+    else root = state.latch ? state.lockedRoot : null;   // no input + no latch -> rest
+  }
+  if(root==null){ updateNow(null,null); return; }
+
+  if(state.quality==='auto') quality = state.heardQuality || state.lockedQuality || 'major';
+  else quality = state.quality;
+
+  state.lockedRoot = root;
+  state.lockedQuality = quality;
+  updateNow(root, quality);
+
+  // run any pending build-up: ramp intensity across the requested bars
+  applyBuild();
+
+  const rootMidi = pcToBassMidi(root);
+  const bs = beatSec();
+  const swung = beat => (state.swing>0 && Math.abs((beat%1)-0.5)<1e-3) ? beat+state.swing*0.5 : beat;
+
+  // ---- BASS (generated) ----
+  if(state.bassOn){
+    generateBass(state.pattern, quality).forEach(ev=>{
+      const when = time + swung(ev.beat)*bs;
+      const dur  = Math.max(0.05, ev.dur*bs*0.96);
+      const midi = rootMidi + ev.semis;
+      bass.triggerAttackRelease(Tone.Frequency(midi,'midi').toNote(), dur, when, ev.vel);
+      vizSchedule(when, midi, ev.dur*bs, ev.vel);
+    });
+  }
+
+  // ---- DRUMS (generated) ----
+  if(state.drums){
+    const cycledFill = state.fillEvery>0 && ((barIndex+1) % state.fillEvery === 0);
+    const isFillBar  = cycledFill || state.fillNow;
+    state.fillNow = false;
+    let events;
+    if(isFillBar){
+      const fillStart = state.drumIntensity>0.6 ? 2 : 3;
+      events = generateDrums(state.drumIntensity, barIndex).filter(d=>d.beat<fillStart)
+               .concat(generateFill(state.drumIntensity, barIndex));
+      crashNext = true;
+    } else {
+      events = generateDrums(state.drumIntensity, barIndex);
+    }
+    // crash to open the bar right after a fill, or on a one-shot request
+    if((crashNext && !isFillBar) || state.crashNow){
+      events = events.filter(d=>!((d.inst==='h'||d.inst==='ride')&&d.beat===0));
+      events.push({beat:0, inst:'crash', vel:0.85});
+      crashNext=false; state.crashNow=false;
+    }
+    events.forEach(d=>hit(d.inst, time + swung(d.beat)*bs, d.vel));
+  } else if(state.crashNow){
+    hit('crash', time, 0.85); state.crashNow=false;
+  }
+  barIndex++;
+}
+
+// build-up: while active, lerp the drum intensity toward full, then throw a fill
+function applyBuild(){
+  if(!state.build) return;
+  state.build.pos++;
+  const t = Math.min(1, state.build.pos/state.build.len);
+  state.drumIntensity = state.build.from + (1-state.build.from)*t;
+  Tone.Draw.schedule(()=>syncIntensityUI(), Tone.now());
+  if(state.build.pos>=state.build.len){ state.fillNow=true; state.build=null; }
+}
+
+function scheduleBeat(time){
+  const b = beatCount % 4;
+  if(state.metro) click.triggerAttackRelease(b===0?'C3':'C2','32n',time, b===0?0.9:0.6);
+  Tone.Draw.schedule(()=>{
+    document.querySelectorAll('#beatDots .bd').forEach((d,i)=>d.classList.toggle('lit', i===b));
+  }, time);
+  beatCount++;
+}
+
+function startTransport(){
+  Tone.Transport.bpm.value = state.bpm;
+  beatCount=0; barIndex=0; crashNext=false;
+  // small count-in offset so first bar lands cleanly
+  barId  = Tone.Transport.scheduleRepeat(scheduleBar, '1m', 0);
+  beatId = Tone.Transport.scheduleRepeat(scheduleBeat, '4n', 0);
+  Tone.Transport.start('+0.1');
+}
+function stopTransport(){
+  if(barId!=null) Tone.Transport.clear(barId);
+  if(beatId!=null) Tone.Transport.clear(beatId);
+  barId=beatId=null;
+  Tone.Transport.stop();
+  document.querySelectorAll('#beatDots .bd').forEach(d=>d.classList.remove('lit'));
+}
+
+// ===========================================================================
+//  4. MIC PITCH DETECTION  (autocorrelation / ACF2+)
+// ===========================================================================
+let analyser=null, micStream=null, micSource=null, detectBuf=null, rafId=null, lastDetect=0;
+let stableCount=0, stablePC=null;
+let lastIntervals=[];   // recent root-relative intervals for major/minor guessing
+
+async function enableMic(){
+  try{
+    micStream = await navigator.mediaDevices.getUserMedia({audio:{
+      echoCancellation:false, noiseSuppression:false, autoGainControl:false
+    }});
+    // Reuse Tone's AudioContext — iOS limits the number of contexts and needs a
+    // user-gesture resume (Tone.start() is called before enableMic).
+    const ctx = Tone.context;
+    micSource = ctx.createMediaStreamSource(micStream);
+    analyser = ctx.createAnalyser();
+    analyser.fftSize = 2048;
+    analyser.smoothingTimeConstant = 0;
+    detectBuf = new Float32Array(analyser.fftSize);
+    micSource.connect(analyser);              // to the analyser only — never to output (no feedback)
+    if(state.recording){ try{ micSource.connect(recDest); micPatched=true; }catch(e){} }  // capture guitar if already recording
+    state.micOn=true;
+    $('micBtn').classList.add('on');
+    $('micBtn').innerHTML='<span class="dot"></span> Mic Live';
+    setStatus('Mic is live — play a note to test detection.');
+    detectLoop();
+  }catch(e){
+    setStatus('Could not access the mic: '+((e&&e.message)||e), true);
+  }
+}
+
+// Pitch detection via the McLeod method (Normalized Square Difference Function).
+// NSDF is normalised per-lag, so it isn't biased toward short lags the way a raw
+// autocorrelation is — that's what lets it nail low bass notes. We then pick the
+// first peak within 90% of the strongest, which avoids octave errors. Search is
+// bounded to the 60–1200 Hz range we care about.
+function autoCorrelate(buf, sampleRate){
+  const SIZE=buf.length;
+  let rms=0; for(let i=0;i<SIZE;i++){const v=buf[i];rms+=v*v;} rms=Math.sqrt(rms/SIZE);
+  const gate=0.004+state.sensitivity*0.0016;     // sensitivity slider = noise gate
+  if(rms<gate) return {freq:-1, rms};
+
+  const minLag=Math.max(2,Math.floor(sampleRate/1200));
+  const maxLag=Math.min(SIZE-1,Math.ceil(sampleRate/60));
+  const nsdf=new Float32Array(maxLag+1);
+  for(let lag=minLag; lag<=maxLag; lag++){
+    let ac=0,m=0;
+    for(let i=0,n=SIZE-lag;i<n;i++){ const a=buf[i],b=buf[i+lag]; ac+=a*b; m+=a*a+b*b; }
+    nsdf[lag]= m>0 ? (2*ac/m) : 0;               // normalised: range -1..1
+  }
+  let globalMax=0;
+  for(let lag=minLag; lag<=maxLag; lag++) if(nsdf[lag]>globalMax) globalMax=nsdf[lag];
+  if(globalMax<=0) return {freq:-1, rms};
+  // first local-max peak that reaches 90% of the strongest -> the fundamental
+  const thresh=0.9*globalMax; let chosen=-1;
+  for(let lag=minLag+1; lag<maxLag; lag++){
+    if(nsdf[lag]>nsdf[lag-1] && nsdf[lag]>=nsdf[lag+1] && nsdf[lag]>=thresh){ chosen=lag; break; }
+  }
+  if(chosen<0){ let mv=-2; for(let lag=minLag; lag<=maxLag; lag++) if(nsdf[lag]>mv){mv=nsdf[lag];chosen=lag;} }
+  if(nsdf[chosen] < 0.5) return {freq:-1, rms};  // low clarity -> treat as no clear pitch
+  // parabolic interpolation around the chosen peak
+  let lag=chosen;
+  if(chosen>minLag && chosen<maxLag){
+    const c0=nsdf[chosen-1], c1=nsdf[chosen], c2=nsdf[chosen+1];
+    const a=(c0+c2-2*c1)/2, b=(c2-c0)/2;
+    if(a) lag=chosen-b/(2*a);
+  }
+  return {freq:sampleRate/lag, rms};
+}
+
+function detectLoop(){
+  rafId = requestAnimationFrame(detectLoop);
+  if(!analyser) return;
+  const t=performance.now(); if(t-lastDetect<28) return; lastDetect=t;   // ~33 fps cap (mobile-friendly)
+  analyser.getFloatTimeDomainData(detectBuf);
+  const {freq, rms} = autoCorrelate(detectBuf, Tone.context.sampleRate);
+
+  // level meter
+  $('levelFill').style.width = Math.min(100, rms*420)+'%';
+
+  if(freq<=0 || freq<60 || freq>1200){
+    // no clear pitch this frame
+    stableCount=0;
+    if(rms<0.01){ setIdleNote(); clearTuner(); }     // true silence -> reset the tuner
+    if(state.rootMode==='follow' && !state.latch && rms<0.01) state.heardPC=null;
+    drawViz();
+    return;
+  }
+
+  const midi = Math.round(12*Math.log2(freq/440)+69);
+  const exact = 440*Math.pow(2,(midi-69)/12);
+  const cents = Math.round(1200*Math.log2(freq/exact));
+  const pc = ((midi%12)+12)%12;
+
+  // drive the note read-out + tuner (chromatic or nearest guitar string)
+  updateTuner(freq, midi, cents, pc);
+
+  // smoothing: require the same pitch class for a few frames before committing
+  if(pc===stablePC) stableCount++;
+  else { stablePC=pc; stableCount=1; }
+
+  if(stableCount>=3 && state.rootMode==='follow'){
+    if(state.heardPC!=null && state.heardPC!==pc){
+      // record interval relative to previous root to guess maj/min
+      let iv=((pc-state.heardPC)%12+12)%12;
+      lastIntervals.push(iv); if(lastIntervals.length>6) lastIntervals.shift();
+      guessQuality();
+    }
+    state.heardPC = pc;
+  }
+  drawViz();
+}
+
+function guessQuality(){
+  // if we recently heard a minor 3rd (3) more than a major 3rd (4), call it minor
+  let maj=0,min=0;
+  lastIntervals.forEach(iv=>{ if(iv===4||iv===8) maj++; if(iv===3||iv===9) min++; });
+  if(min>maj) state.heardQuality='minor';
+  else if(maj>min) state.heardQuality='major';
+}
+
+function setIdleNote(){
+  $('detNote').classList.add('idle');
+  if(!state.heardPC && state.rootMode==='follow'){ $('detNote').textContent='—'; }
+}
+
+// ---- Tuner: nearest standard-tuning string + flat/sharp read-out ----------
+const STRINGS=[{name:'E',midi:40},{name:'A',midi:45},{name:'D',midi:50},{name:'G',midi:55},{name:'B',midi:59},{name:'e',midi:64}];
+const midiToFreq=m=>440*Math.pow(2,(m-69)/12);
+function buildStrings(){
+  const el=$('strings'); el.innerHTML='';
+  STRINGS.forEach((s,i)=>{
+    const d=document.createElement('div'); d.className='string-pill'; d.dataset.i=i;
+    d.innerHTML='<div class="sn">'+s.name+'</div><div class="so">'+s.name.toUpperCase()+(Math.floor(s.midi/12)-1)+'</div>';
+    el.appendChild(d);
+  });
+}
+function updateTuner(freq, midi, chromCents, pc){
+  // nearest open-string by cents distance
+  let bestS=0, bestC=1e9;
+  STRINGS.forEach((s,i)=>{ const cc=1200*Math.log2(freq/midiToFreq(s.midi)); if(Math.abs(cc)<Math.abs(bestC)){bestC=cc;bestS=i;} });
+  let name, oct, showC;
+  if(state.tunerMode==='guitar'){ name=STRINGS[bestS].name; oct=''; showC=bestC; }
+  else { name=NOTE_NAMES[pc]; oct=(Math.floor(midi/12)-1); showC=chromCents; }
+  $('detNote').textContent=name+oct; $('detNote').classList.remove('idle');
+  $('detFreq').textContent=freq.toFixed(1)+' Hz';
+  const clamped=Math.max(-50,Math.min(50,showC));
+  $('cents').textContent=(showC>0?'+':'')+Math.round(showC)+' ¢';
+  $('needle').style.left=(50+clamped)+'%';
+  const inTune=Math.abs(bestC)<5;
+  $('strings').querySelectorAll('.string-pill').forEach((p,i)=>{
+    p.classList.toggle('near', i===bestS && !inTune);
+    p.classList.toggle('intune', i===bestS && inTune);
+  });
+  setTuneStatus(showC, state.tunerMode==='guitar' ? STRINGS[bestS].name+' string' : name);
+}
+function setTuneStatus(c, target){
+  const el=$('tuneStatus'); el.classList.remove('intune','flat','sharp');
+  if(Math.abs(c)<5){ el.textContent='✓ '+target+' — in tune'; el.classList.add('intune'); }
+  else if(c<0){ el.textContent='♭ '+target+' is flat — tune up'; el.classList.add('flat'); }
+  else { el.textContent='♯ '+target+' is sharp — tune down'; el.classList.add('sharp'); }
+}
+function clearTuner(){
+  $('strings').querySelectorAll('.string-pill').forEach(p=>p.classList.remove('near','intune'));
+  const el=$('tuneStatus'); el.classList.remove('intune','flat','sharp'); el.textContent='play a note…';
+}
+
+function disableMic(){
+  if(rafId) cancelAnimationFrame(rafId); rafId=null;
+  if(micSource){ try{ micSource.disconnect(); }catch(e){} micSource=null; }
+  if(micStream){ micStream.getTracks().forEach(t=>t.stop()); micStream=null; }
+  analyser=null;                       // do NOT close Tone.context — playback needs it
+  state.micOn=false; state.heardPC=null;
+  $('levelFill').style.width='0%';
+  $('detNote').textContent='—'; $('detNote').classList.add('idle');
+  $('detFreq').textContent='mic off';
+  $('micBtn').classList.remove('on');
+  $('micBtn').innerHTML='<span class="dot"></span> Enable Mic';
+}
+
+// ===========================================================================
+//  5. VISUALIZER  — scrolling lane of bass notes + the live input level
+// ===========================================================================
+const canvas=$('viz'), vctx=canvas.getContext('2d');
+let vizBlocks=[];   // {startSec, midi, durSec, vel}
+function resizeViz(){ canvas.width=canvas.clientWidth*devicePixelRatio; canvas.height=120*devicePixelRatio; vctx.setTransform(devicePixelRatio,0,0,devicePixelRatio,0,0); }
+window.addEventListener('resize',resizeViz); resizeViz();
+
+function vizSchedule(when, midi, durSec, vel){
+  vizBlocks.push({startSec:when, midi, durSec, vel});
+  if(vizBlocks.length>200) vizBlocks.shift();
+}
+
+function drawViz(){
+  const w=canvas.clientWidth, h=120;
+  vctx.clearRect(0,0,w,h);
+  // baseline grid
+  vctx.strokeStyle='rgba(255,255,255,.05)';
+  for(let i=0;i<4;i++){ const x=w*0.7*(i/4)+w*0.3; vctx.beginPath();vctx.moveTo(x,0);vctx.lineTo(x,h);vctx.stroke(); }
+
+  const now = Tone.Transport.seconds;
+  const win = 4*beatSec();          // 1 bar window
+  const playhead = w*0.3;
+  const midiMin=24, midiMax=64;     // bass display range (covers C1..E4 incl. octave jumps)
+
+  // moving bass blocks
+  vizBlocks.forEach(b=>{
+    const dt = b.startSec - now;             // seconds until/since it plays
+    if(dt> win || dt < -win) return;
+    const x = playhead + (dt/win)*(w-playhead);
+    const bw = Math.max(4,(b.durSec/win)*(w-playhead));
+    const y = h - ((b.midi-midiMin)/(midiMax-midiMin))*(h-20) - 10;
+    const past = dt<0;
+    vctx.fillStyle = past ? 'rgba(245,158,11,'+(0.25+b.vel*0.4)+')' : 'rgba(251,191,36,'+(0.5+b.vel*0.4)+')';
+    roundRect(vctx,x,y-6,bw,12,4); vctx.fill();
+  });
+
+  // playhead
+  vctx.fillStyle='rgba(52,211,153,.9)';
+  vctx.fillRect(playhead-1,0,2,h);
+
+  // input level as a soft pulse on the left
+  if(state.micOn){
+    const lv = Math.min(1, parseFloat($('levelFill').style.width||'0')/100);
+    vctx.fillStyle='rgba(56,189,248,'+(0.1+lv*0.5)+')';
+    vctx.fillRect(0,h-lv*h,playhead*0.5,lv*h);
+  }
+}
+function roundRect(c,x,y,w,h,r){c.beginPath();c.moveTo(x+r,y);c.arcTo(x+w,y,x+w,y+h,r);c.arcTo(x+w,y+h,x,y+h,r);c.arcTo(x,y+h,x,y,r);c.arcTo(x,y,x+w,y,r);c.closePath();}
+
+// keep the viz animating even when no mic frames arrive
+function vizTick(){ if(state.playing) drawViz(); requestAnimationFrame(vizTick); }
+vizTick();
+
+// ===========================================================================
+//  6. UI WIRING
+// ===========================================================================
+function setStatus(msg, err){ const s=$('status'); s.textContent=msg; s.classList.toggle('err',!!err); }
+function updateNow(root, quality){
+  if(root==null){ $('nowBass').textContent='—'; $('nowChord').textContent='rest'; return; }
+  const q = quality==='minor'?'m':'';
+  $('nowBass').textContent = NOTE_NAMES[root];
+  $('nowChord').textContent = NOTE_NAMES[root]+q;
+}
+
+// play / stop
+$('playBtn').addEventListener('click', async ()=>{
+  await Tone.start();
+  if(!state.playing){
+    state.playing=true;
+    $('playBtn').classList.add('playing');
+    $('playBtn').innerHTML='■ <span id="playLabel">Stop</span>';
+    if(state.rootMode==='manual') state.lockedRoot=state.manualRoot;
+    startTransport();
+    setStatus(state.micOn ? 'Jamming — play your guitar!' : 'Jamming. Enable the mic to make the bass follow you, or use Manual key.');
+  } else {
+    state.playing=false;
+    $('playBtn').classList.remove('playing');
+    $('playBtn').innerHTML='▶ <span id="playLabel">Start Jam</span>';
+    stopTransport();
+  }
+});
+
+// mic
+$('micBtn').addEventListener('click', async ()=>{
+  if(!state.micOn){ await Tone.start(); enableMic(); }
+  else disableMic();
+});
+
+// ---- shared setters: keep state + on-screen controls in sync, so the panel
+//      AND typed instructions both drive the one band -----------------------
+const octNames={'-1':'sub','0':'low','1':'mid','2':'high'};
+const sensNames=['','very loose','loose','relaxed','normal','normal','focused','focused','tight','tight','very tight'];
+const intensityName=v=>v<.2?'soft':v<.45?'easy':v<.7?'medium':v<.9?'driving':'full-on';
+
+function syncIntensityUI(){ $('intensity').value=Math.round(state.drumIntensity*100); $('intVal').textContent=intensityName(state.drumIntensity); }
+function setIntensity(v){ state.drumIntensity=Math.max(0,Math.min(1,v)); syncIntensityUI(); }
+function setBpm(v){ state.bpm=Math.max(50,Math.min(200,Math.round(v))); $('bpm').value=state.bpm; $('bpmVal').textContent=state.bpm; Tone.Transport.bpm.rampTo(state.bpm,0.1); }
+function setSwing(v){ state.swing=Math.max(0,Math.min(.6,v)); $('swing').value=Math.round(state.swing*100); $('swingVal').textContent=Math.round(state.swing*100); }
+function setVol(v){ state.volume=Math.max(0,Math.min(1,v)); $('vol').value=Math.round(state.volume*100); $('volVal').textContent=Math.round(state.volume*100); bassVol.volume.value=state.volume<=0?-Infinity:20*Math.log10(state.volume); }
+function setDrumVolume(v){ v=Math.max(0,Math.min(1,v)); $('drumVol').value=Math.round(v*100); $('drumVolVal').textContent=Math.round(v*100); drumVol.volume.value=v<=0?-Infinity:20*Math.log10(v); }
+function setOctave(v){ state.octaveShift=Math.max(-1,Math.min(2,Math.round(v))); $('octave').value=state.octaveShift; $('octVal').textContent=octNames[state.octaveShift]; }
+function setBassStyle(name){ if(!BASS_PROFILES[name])return; state.pattern=name; $('pattern').value=name; }
+function setDrumStyle(name){ state.drumStyle=name; $('drumStyle').value=name; }
+function setQuality(q){ state.quality=q; $('quality').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.q===q)); }
+function setRootMode(m){ state.rootMode=m; $('rootMode').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x.dataset.m===m)); $('keyPicker').classList.toggle('disabled',m!=='manual'); $('lockMode').textContent=m==='manual'?'manual':'follow'; }
+function setManualRoot(pc){ state.manualRoot=pc; state.lockedRoot=pc; $('keyPicker').querySelectorAll('button').forEach(x=>x.classList.toggle('active',+x.dataset.pc===pc)); }
+function setFillEvery(n){ state.fillEvery=n; $('fillSel').querySelectorAll('button').forEach(x=>x.classList.toggle('active',+x.dataset.f===n)); }
+function setDrums(on){ state.drums=on; $('drumsOn').checked=on; }
+
+// ---- control wiring (delegates to the setters above) ----------------------
+$('bpm').addEventListener('input', e=>setBpm(+e.target.value));
+$('pattern').addEventListener('change', e=>setBassStyle(e.target.value));
+$('octave').addEventListener('input', e=>setOctave(+e.target.value));
+$('vol').addEventListener('input', e=>setVol(+e.target.value/100));
+$('swing').addEventListener('input', e=>setSwing(+e.target.value/100));
+$('quality').addEventListener('click', e=>{const b=e.target.closest('button'); if(b) setQuality(b.dataset.q);});
+$('rootMode').addEventListener('click', e=>{const b=e.target.closest('button'); if(b) setRootMode(b.dataset.m);});
+$('sens').addEventListener('input', e=>{ state.sensitivity=+e.target.value; $('sensVal').textContent=sensNames[state.sensitivity]; });
+$('drumsOn').addEventListener('change', e=>state.drums=e.target.checked);
+$('metroOn').addEventListener('change', e=>state.metro=e.target.checked);
+$('latchOn').addEventListener('change', e=>state.latch=e.target.checked);
+// drummer controls
+$('drumStyle').addEventListener('change', e=>setDrumStyle(e.target.value));
+$('intensity').addEventListener('input', e=>setIntensity(+e.target.value/100));
+$('fillSel').addEventListener('click', e=>{const b=e.target.closest('button'); if(b) setFillEvery(+b.dataset.f);});
+$('drumVol').addEventListener('input', e=>setDrumVolume(+e.target.value/100));
+
+// tap tempo
+let taps=[];
+$('tapBtn').addEventListener('click', ()=>{
+  const now=performance.now(); taps.push(now); taps=taps.filter(t=>now-t<2500);
+  if(taps.length>=2){
+    let sum=0; for(let i=1;i<taps.length;i++) sum+=taps[i]-taps[i-1];
+    const bpm=Math.round(60000/(sum/(taps.length-1)));
+    if(bpm>=40&&bpm<=240) setBpm(bpm);
+  }
+  $('tapBtn').textContent='Tap! ('+taps.length+')';
+  clearTimeout($('tapBtn')._t); $('tapBtn')._t=setTimeout(()=>$('tapBtn').textContent='Tap Tempo',1200);
+});
+
+// key picker
+const kp=$('keyPicker');
+NOTE_NAMES.forEach((n,i)=>{
+  const b=document.createElement('button'); b.textContent=n; b.dataset.pc=i;
+  if(i===state.manualRoot) b.classList.add('active');
+  b.addEventListener('click',()=>setManualRoot(i));
+  kp.appendChild(b);
+});
+
+// tuner mode (chromatic vs nearest guitar string)
+buildStrings();
+$('tunerMode').addEventListener('click', e=>{
+  const b=e.target.closest('button'); if(!b) return;
+  state.tunerMode=b.dataset.t;
+  $('tunerMode').querySelectorAll('button').forEach(x=>x.classList.toggle('active',x===b));
+});
+
+// ===========================================================================
+//  7. INSTRUCT THE BAND  — turn typed / clicked commands into musical actions
+//  A small keyword interpreter maps natural phrases onto the same setters and
+//  one-shot flags the scheduler reads. Chain commands with commas.
+// ===========================================================================
+const NOTE_LETTER={c:0,d:2,e:4,f:5,g:7,a:9,b:11};
+const GENRES={
+  rock:  {bass:'rootEighths', drum:'rock'},
+  funk:  {bass:'octaves',     drum:'funk'},
+  jazz:  {bass:'walking',     drum:'jazz',  swing:.55},
+  pop:   {bass:'syncopop',    drum:'pop'},
+  reggae:{bass:'reggae',      drum:'reggae'},
+  ballad:{bass:'ballad',      drum:'ballad'},
+  hiphop:{bass:'syncopop',    drum:'hiphop',swing:.3},
+};
+const escapeHtml=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+
+function logBand(you, band, miss){
+  const log=$('bandLog');
+  const line=document.createElement('div'); line.className='line'+(miss?' miss':'');
+  line.innerHTML=(you?'<span class="you">You:</span> '+escapeHtml(you)+'<br>':'')+'<span class="band">Band:</span> '+escapeHtml(band);
+  log.prepend(line);
+  while(log.children.length>20) log.removeChild(log.lastChild);
+}
+
+function parseKey(c){
+  // require a key cue so we don't pick stray letters out of ordinary words
+  let m=c.match(/(?:key of|play in|vamp on|go to|in|on|to)\s+([a-g])\s*(#|b|sharp|flat)?\s*(minor|min|maj|major)?/);
+  if(!m) m=c.match(/\b([a-g])\s*(#|b|sharp|flat)?\s+(minor|major|min|maj)\b/);
+  if(!m) return null;
+  let pc=NOTE_LETTER[m[1]]; const acc=(m[2]||'').trim();
+  if(acc==='#'||acc==='sharp') pc=(pc+1)%12; else if(acc==='b'||acc==='flat') pc=(pc+11)%12;
+  const q=/min/.test(m[3]||'')?'minor':(/maj/.test(m[3]||'')?'major':null);
+  return {pc,q};
+}
+
+function applyClause(c){
+  const replies=[]; const has=(...w)=>w.some(x=>c.includes(x));
+  const tail=state.playing?'':' (start the jam to hear it)';
+
+  // genre — sets both bass + drums (and swing where it belongs)
+  for(const g in GENRES){
+    const alias=g==='hiphop'?['hip hop','hiphop','boom bap','boombap']:[g];
+    if(alias.some(a=>c.includes(a))){
+      const G=GENRES[g]; setBassStyle(G.bass); setDrumStyle(G.drum);
+      if(G.swing!=null) setSwing(G.swing);
+      replies.push('Switching to '+g+'.'); break;
+    }
+  }
+  // key / chord colour
+  const k=parseKey(c);
+  if(k){ setRootMode('manual'); setManualRoot(k.pc); if(k.q) setQuality(k.q);
+         replies.push('Locked to '+NOTE_NAMES[k.pc]+(k.q?' '+k.q:'')+'.'); }
+  else if(/\bminor\b/.test(c)){ setQuality('minor'); replies.push('Going minor.'); }
+  else if(/\bmajor\b/.test(c)){ setQuality('major'); replies.push('Going major.'); }
+
+  // explicit bass styles
+  if(has('walk')){ setBassStyle('walking'); replies.push('Walking the bass.'); }
+  else if(has('octave','pops')){ setBassStyle('octaves'); replies.push('Octave pops.'); }
+  else if(has('root and fifth','root fifth','simple bass','keep it simple')){ setBassStyle('rootFifth'); replies.push('Root and fifth.'); }
+  else if(has('eighths','driving','straight eight')){ setBassStyle('rootEighths'); replies.push('Driving eighths.'); }
+
+  if(has('follow me','follow my','listen to my','follow the guitar')){ setRootMode('follow'); replies.push('Following your guitar.'); }
+
+  // intensity
+  if(has('busier','more energy','harder','heavier','go off','intense','dig in','bring it','more drive','pick it up the energy')){ setIntensity(state.drumIntensity+0.2); replies.push('More energy — '+intensityName(state.drumIntensity)+'.'); }
+  if(has('calm','chill','softer','mellow','relax','lighter','ease up','back off','gentler','tone it down')){ setIntensity(state.drumIntensity-0.2); replies.push('Easing off — '+intensityName(state.drumIntensity)+'.'); }
+
+  // build-up
+  if(has('build up','build it','build','crescendo')){ state.build={from:state.drumIntensity,len:4,pos:0}; replies.push('Building up over 4 bars…'+tail); }
+
+  // fills
+  if(/\bfills?\b/.test(c)&&has('more','every bar','lots')){ setFillEvery(2); replies.push('More fills — every 2 bars.'); }
+  else if(/\bfills?\b/.test(c)&&has('less','fewer')){ setFillEvery(8); replies.push('Fewer fills — every 8 bars.'); }
+  else if(/\bfills?\b/.test(c)&&has('no ','stop','none','without')){ setFillEvery(0); replies.push('No more fills.'); }
+  else if(/\bfill\b/.test(c)){ state.fillNow=true; replies.push('Fill coming up!'+tail); }
+
+  // crash
+  if(has('crash','cymbal','big accent')){ state.crashNow=true; replies.push('Crash!'+tail); }
+
+  // tempo
+  if(has('double time','double-time')){ setBpm(state.bpm*2); replies.push('Double-time — '+state.bpm+' BPM.'); }
+  else if(has('half time','half-time')){ setBpm(state.bpm/2); replies.push('Half-time — '+state.bpm+' BPM.'); }
+  else {
+    const bm=c.match(/(\d{2,3})\s*bpm/)||c.match(/(?:tempo|at|to)\s+(\d{2,3})\b/);
+    if(bm){ setBpm(+bm[1]); replies.push('Tempo — '+state.bpm+' BPM.'); }
+    else if(has('faster','speed up','quicker','push it')){ setBpm(state.bpm+8); replies.push('Faster — '+state.bpm+' BPM.'); }
+    else if(has('slower','slow down','take it down')){ setBpm(state.bpm-8); replies.push('Slower — '+state.bpm+' BPM.'); }
+  }
+
+  // swing
+  if(has('swing','shuffle')){ setSwing(state.swing>0?state.swing:.55); replies.push('Swinging it.'); }
+  if(has('straight','no swing','straighten')){ setSwing(0); replies.push('Playing it straight.'); }
+
+  // bass volume
+  if(has('louder','turn up','pump it','crank')){ setVol(state.volume+0.15); replies.push('Bass up — '+Math.round(state.volume*100)+'%.'); }
+  if(has('quieter','turn down','bass down')){ setVol(state.volume-0.15); replies.push('Bass down — '+Math.round(state.volume*100)+'%.'); }
+
+  // octave
+  if(has('higher','octave up','up an octave')){ setOctave(state.octaveShift+1); replies.push('Up an octave.'); }
+  if(has('lower','octave down','down an octave','deeper')){ setOctave(state.octaveShift-1); replies.push('Down low.'); }
+
+  // drums in/out
+  if(has('drop the drum','no drums','drums out','kill the drum','stop the drum','mute the drum','without drums')){ setDrums(false); replies.push('Drums out.'); }
+  else if(has('drums back','drums in','bring the drums','add drums','drums on')){ setDrums(true); replies.push('Drums back in.'); }
+
+  // bass in/out
+  if(has('drop the bass','no bass','bass out','kill the bass','mute the bass','without bass')){ state.bassOn=false; replies.push('Bass out.'); }
+  else if(has('bass back','bass in','bring the bass','bass on')){ state.bassOn=true; replies.push('Bass back in.'); }
+
+  // transport
+  if(has('stop playing','take a break','take five','stop the band')){ if(state.playing) $('playBtn').click(); replies.push('Taking five.'); }
+  else if(has('start','count us in','hit it','let')&&!state.playing&&replies.length===0){ $('playBtn').click(); replies.push('Counting it in!'); }
+
+  return replies;
+}
+
+function instruct(text){
+  const raw=(text||'').trim(); if(!raw) return;
+  const clauses=raw.toLowerCase().split(/[,;]|\bthen\b/).map(s=>s.trim()).filter(Boolean);
+  let all=[]; clauses.forEach(c=>{ all=all.concat(applyClause(c)); });
+  if(all.length) logBand(raw, all.join(' '));
+  else logBand(raw, "Didn't catch that — try ‘walk it’, ‘funk’, ‘busier’, ‘give me a fill’, ‘play in A minor’.", true);
+}
+
+$('cmdSend').addEventListener('click', ()=>{ instruct($('cmdInput').value); $('cmdInput').value=''; $('cmdInput').focus(); });
+$('cmdInput').addEventListener('keydown', e=>{ if(e.key==='Enter'){ instruct($('cmdInput').value); $('cmdInput').value=''; } });
+$('quickCmds').addEventListener('click', e=>{ const b=e.target.closest('button'); if(b) instruct(b.dataset.cmd); });
+
+// ===========================================================================
+//  8. RECORD A SESSION  — capture the master bus (+ guitar) with MediaRecorder.
+//  Mixed entirely in the browser; the clip never leaves the device.
+// ===========================================================================
+let recorder=null, recChunks=[], recStart=0, recTimer=null, micPatched=false, recTakes=0;
+
+function pickRecMime(){
+  if(!window.MediaRecorder) return null;
+  for(const t of ['audio/webm;codecs=opus','audio/webm','audio/mp4','audio/aac']){
+    try{ if(MediaRecorder.isTypeSupported(t)) return t; }catch(e){}
+  }
+  return '';   // none matched -> let the browser pick its default
+}
+const fmtTime=s=>Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
+
+async function toggleRecording(){
+  await Tone.start();
+  if(state.recording) stopRecording(); else startRecording();
+}
+function startRecording(){
+  const mime=pickRecMime();
+  if(mime===null){ setStatus('Recording isn’t supported in this browser.', true); return; }
+  if(micSource && !micPatched){ try{ micSource.connect(recDest); micPatched=true; }catch(e){} }  // include the guitar
+  recChunks=[];
+  try{ recorder=new MediaRecorder(recDest.stream, mime?{mimeType:mime}:undefined); }
+  catch(e){ setStatus('Could not start recording: '+((e&&e.message)||e), true); return; }
+  recorder.ondataavailable=e=>{ if(e.data&&e.data.size) recChunks.push(e.data); };
+  recorder.onstop=finishRecording;
+  recorder.start();
+  state.recording=true; recStart=performance.now();
+  $('recBtn').classList.add('recording');
+  $('recBtn').innerHTML='■ <span id="recTime">0:00</span>';
+  recTimer=setInterval(()=>{ const el=$('recTime'); if(el) el.textContent=fmtTime(Math.floor((performance.now()-recStart)/1000)); }, 250);
+  setStatus('Recording… play away, hit ■ to stop.');
+}
+function stopRecording(){
+  try{ if(recorder && recorder.state!=='inactive') recorder.stop(); }catch(e){}
+  clearInterval(recTimer); recTimer=null;
+  state.recording=false;
+  $('recBtn').classList.remove('recording');
+  $('recBtn').innerHTML='● <span>Record</span>';
+  if(micSource && micPatched){ try{ micSource.disconnect(recDest); }catch(e){} micPatched=false; }
+}
+function finishRecording(){
+  if(!recChunks.length){ setStatus('Nothing was captured — try again.', true); return; }
+  const type=(recorder&&recorder.mimeType)||'audio/webm';
+  const blob=new Blob(recChunks,{type});
+  addRecording(URL.createObjectURL(blob), type, blob.size);
+  setStatus('Take saved below — play it back or download it.');
+}
+function addRecording(url, type, size){
+  $('recEmpty').style.display='none';
+  const ext=(type.includes('mp4')||type.includes('aac'))?'m4a':(type.includes('ogg')?'ogg':'webm');
+  const n=++recTakes;
+  const item=document.createElement('div'); item.className='rec-item';
+  const kb=size?(' · '+(size/1024).toFixed(0)+' KB'):'';
+  item.innerHTML='<div class="rec-meta"><span>Take '+n+'</span><span class="rec-stamp">'+new Date().toLocaleTimeString()+kb+'</span></div>';
+  const audio=document.createElement('audio'); audio.controls=true; audio.src=url;
+  const actions=document.createElement('div'); actions.className='rec-actions';
+  const dl=document.createElement('a'); dl.href=url; dl.download='jam-take-'+n+'.'+ext; dl.className='rec-dl'; dl.textContent='⬇ Download';
+  const del=document.createElement('button'); del.className='rec-del'; del.textContent='✕ Remove';
+  del.addEventListener('click',()=>{ URL.revokeObjectURL(url); item.remove(); if(!$('recList').children.length) $('recEmpty').style.display=''; });
+  actions.appendChild(dl); actions.appendChild(del);
+  item.appendChild(audio); item.appendChild(actions);
+  $('recList').prepend(item);
+}
+$('recBtn').addEventListener('click', toggleRecording);
+
+// spacebar = play/stop (ignored while typing a command)
+window.addEventListener('keydown', e=>{
+  if(e.code==='Space' && e.target.tagName!=='INPUT' && e.target.tagName!=='SELECT'){
+    e.preventDefault(); $('playBtn').click();
+  }
+});
+
+// ---- initial sync ----
+setVol(state.volume); setDrumVolume(0.75); syncIntensityUI();
+logBand('', 'Ready when you are. Hit Start Jam, then tell me what to play.');
+</script>
+</body>
+</html>

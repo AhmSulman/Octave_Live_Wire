@@ -210,6 +210,13 @@ nav{
 /* Card 5 – Pad */
 .card-pad::before{background:linear-gradient(135deg,rgba(109,40,217,.18),rgba(167,139,250,.12))}
 .card-pad:hover{box-shadow:0 30px 60px rgba(109,40,217,.3),0 0 0 1px rgba(167,139,250,.4)}
+/* Card 6 – Bassist */
+.card-bassist::before{background:linear-gradient(135deg,rgba(234,88,12,.16),rgba(217,119,6,.14))}
+.card-bassist:hover{box-shadow:0 30px 60px rgba(234,88,12,.28),0 0 0 1px rgba(251,191,36,.4)}
+.card-bassist .card-icon-wrap{background:linear-gradient(135deg,rgba(234,88,12,.35),rgba(217,119,6,.25))}
+.card-bassist .card-tag{background:rgba(234,88,12,.2);color:var(--gold-light)}
+.card-bassist .launch-text{color:var(--gold-light)}
+.bass-preview{display:flex;align-items:center;gap:4px;height:60px}
 
 .card-icon-wrap{
   width:64px;height:64px;border-radius:18px;
@@ -391,6 +398,7 @@ footer span{
     <a href="{% url 'backing_track_creator:guitar_fretboard' %}">Guitar</a>
     <a href="{% url 'backing_track_creator:backing_track' %}">Studio</a>
     <a href="{% url 'pad:pad' %}">Pad</a>
+    <a href="{% url 'bassist:bassist' %}">Bassist</a>
   </div>
 </nav>
 
@@ -401,7 +409,7 @@ footer span{
     <span class="line1">OCTAVE</span>
     <span class="line2">LIVE WIRE</span>
   </h1>
-  <p class="hero-sub">Five professional-grade music tools in one studio. Analyze, learn, visualize, create, and code music — all in your browser.</p>
+  <p class="hero-sub">Six professional-grade music tools in one studio. Analyze, learn, visualize, create, code, and jam with a live band — all in your browser.</p>
   <a href="#apps" class="hero-cta">Explore the Suite ↓</a>
   <div class="scroll-indicator">
     <span>Scroll</span>
@@ -412,7 +420,7 @@ footer span{
 <!-- Stats -->
 <div class="stats-bar">
   <div class="stats-inner">
-    <div class="stat"><div class="stat-num">5</div><div class="stat-label">Music Tools</div></div>
+    <div class="stat"><div class="stat-num">6</div><div class="stat-label">Music Tools</div></div>
     <div class="stat"><div class="stat-num">100+</div><div class="stat-label">Piano Notes</div></div>
     <div class="stat"><div class="stat-num">6</div><div class="stat-label">Guitar Tunings</div></div>
     <div class="stat"><div class="stat-num">5</div><div class="stat-label">Genres</div></div>
@@ -562,6 +570,27 @@ footer span{
       </div>
     </a>
 
+    <!-- 6 · Bassist Bot -->
+    <a href="{% url 'bassist:bassist' %}" class="app-card card-bassist">
+      <div class="card-icon-wrap">🎸</div>
+      <div class="card-tag">Live Jam</div>
+      <div class="card-preview">
+        <div class="bass-preview" id="bassPreview"></div>
+      </div>
+      <h3 class="card-title">Bassist Bot</h3>
+      <p class="card-desc">Jam with a virtual rhythm section. It listens to your guitar through the mic, follows your key in real time, and lays down a generated bass line and drummer you can instruct on the fly.</p>
+      <div class="card-features">
+        <span class="feature-chip">Mic Follow</span>
+        <span class="feature-chip">Generative Bass</span>
+        <span class="feature-chip">Drummer</span>
+        <span class="feature-chip">Instruct the Band</span>
+      </div>
+      <div class="card-launch">
+        <span class="launch-text">Start Jamming</span>
+        <span class="launch-arrow">→</span>
+      </div>
+    </a>
+
   </div>
 </section>
 
@@ -655,6 +684,19 @@ pattern.forEach(active => {
   cell.className = 'drum-cell' + (active ? ' active' : '');
   if(active) cell.style.animationDelay = (Math.random() * .5) + 's';
   drumPreview.appendChild(cell);
+});
+
+// ── Bassist preview bars ──
+const bassPreview = document.getElementById('bassPreview');
+[40,70,30,85,55,75,45,65,50].forEach((h, i) => {
+  const bar = document.createElement('div');
+  bar.className = 'wave-bar';
+  bar.style.height = h + '%';
+  bar.style.width = '6px';
+  bar.style.background = 'linear-gradient(to top,var(--gold),var(--gold-light))';
+  bar.style.animationDelay = (i * 0.08) + 's';
+  bar.style.animationDuration = (0.7 + Math.random() * 0.6) + 's';
+  bassPreview.appendChild(bar);
 });
 </script>
 </body>
