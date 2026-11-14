@@ -9,8 +9,10 @@ urlpatterns = [
     path("piano/", views.piano_learner_view, name="piano_learner"),
     path("guitar/", views.guitar_fretboard_view, name="guitar_fretboard"),
     path("backing-track/", views.backing_track_view, name="backing_track"),
+    path("contact/", views.contact_view, name="contact"),
     # API endpoints
     path("api/analyze/", views.analyze_audio, name="analyze_audio"),
     path("api/fretboard/", views.get_fretboard_data, name="fretboard_data"),
     path("api/compose/", views.auto_compose, name="auto_compose"),
+    path("api/contact/", views.send_contact, name="send_contact"),
 ]

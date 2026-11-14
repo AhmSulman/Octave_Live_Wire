@@ -83,7 +83,7 @@ nav{
 /* ── Hero ── */
 .hero{
   position:relative;z-index:1;
-  min-height:100vh;
+  min-height:100vh;min-height:var(--vh-full,100vh);
   display:flex;flex-direction:column;align-items:center;justify-content:center;
   text-align:center;
   padding:8rem 2rem 4rem;
@@ -360,6 +360,9 @@ footer{
   border-top:1px solid var(--border);
   color:var(--text-muted);font-size:.85rem;
 }
+.nav-contact-mobile{display:none!important}
+footer a{color:var(--purple-light);text-decoration:none;font-weight:600}
+footer a:hover{text-decoration:underline}
 footer span{
   background:linear-gradient(135deg,var(--purple-light),var(--cyan-light));
   -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
@@ -372,11 +375,12 @@ footer span{
 @media(max-width:768px){
   nav{padding:.8rem 1.5rem}
   .nav-links{display:none}
+  .nav-contact-mobile{display:inline-flex!important}
   .stats-inner{flex-wrap:wrap;gap:2rem;padding:1.5rem 2rem}
   .hero{padding:7rem 1.5rem 4rem}
 }
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
 </head>
 <body>
 
@@ -392,7 +396,9 @@ footer span{
     <a href="{% url 'backing_track_creator:guitar_fretboard' %}">Guitar</a>
     <a href="{% url 'backing_track_creator:backing_track' %}">Studio</a>
     <a href="{% url 'pad:pad' %}">Pad</a>
+    <a href="{% url 'backing_track_creator:contact' %}">Contact</a>
   </div>
+  <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link nav-contact-mobile">✉ Contact</a>
 </nav>
 
 <!-- Hero -->
@@ -568,6 +574,7 @@ footer span{
 
 <footer>
   <p>Built with ♪ by AHMED SALMAN <span>Octave Live Wire</span> · Professional Music Creation Suite</p>
+  <p style="margin-top:.5rem"><a href="{% url 'backing_track_creator:contact' %}">Contact me</a> · <a href="https://ahmed-salman.vercel.app/" target="_blank" rel="noopener">Portfolio</a> · <a href="https://github.com/AhmSulman" target="_blank" rel="noopener">GitHub</a> · <a href="https://www.linkedin.com/in/ahmed-salman-maan" target="_blank" rel="noopener">LinkedIn</a> · <a href="https://www.youtube.com/@Ahm3dSulman" target="_blank" rel="noopener">YouTube</a></p>
 </footer>
 
 <script>

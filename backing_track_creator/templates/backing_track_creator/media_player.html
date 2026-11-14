@@ -38,8 +38,8 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .layout{
   flex:1;display:grid;
   grid-template-columns:320px 1fr;
-  gap:0;height:calc(100vh - 60px);
-  overflow:hidden;
+  gap:0;height:calc(100vh - 60px);height:calc(var(--vh-full,100vh) - 60px);
+  overflow:hidden;min-height:0;
 }
 /* Sidebar */
 .sidebar{
@@ -306,13 +306,22 @@ input[type=range].vol-slider::-webkit-slider-thumb{
 /* Loading spinner */
 .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
+/* Phones and short landscape screens: let the page scroll naturally
+   (the fixed-height layout clipped the bottom of the player). */
+@media(max-width:768px),(orientation:landscape) and (max-height:560px){
+  .topbar{padding:.5rem .9rem;flex-wrap:wrap;gap:.5rem}
+  .topbar > div:last-child{flex-wrap:wrap;gap:.5rem!important}
+  .back-btn,.olw-contact-link{padding:.35rem .8rem;font-size:.78rem}
+  .layout{display:flex;flex-direction:column;height:auto;overflow:visible}
+  .main{order:-1;overflow:visible;padding:1rem .8rem}
+  .sidebar{max-height:none;overflow:visible}
+  .file-list{max-height:300px}
+}
 @media(max-width:768px){
-  .layout{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  .sidebar{max-height:220px}
   .analysis-row{grid-template-columns:1fr}
 }
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
 </head>
 <body>
 
@@ -321,6 +330,7 @@ input[type=range].vol-slider::-webkit-slider-thumb{
   <div style="display:flex;align-items:center;gap:1rem">
     <span style="font-family:'Orbitron',sans-serif;font-size:.8rem;color:var(--purple-l)">🎵 MEDIA PLAYER</span>
     <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+    <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link">✉ Contact</a>
   </div>
 </div>
 

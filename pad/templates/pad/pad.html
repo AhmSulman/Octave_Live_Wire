@@ -88,7 +88,7 @@ html,body{height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;bac
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
 
 /* ── Main layout ── */
-.layout{display:grid;grid-template-columns:270px 1fr 260px;height:calc(100vh - 52px);overflow:hidden}
+.layout{display:grid;grid-template-columns:270px 1fr 260px;height:calc(100vh - 52px);height:calc(var(--vh-full,100vh) - 52px);overflow:hidden}
 
 /* ── Docs panel ── */
 .docs-panel{
@@ -283,12 +283,22 @@ html,body{height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;bac
 .toast-err{background:linear-gradient(135deg,#7f1d1d,#ef4444);color:#fff}
 .toast-info{background:rgba(124,58,237,.9);color:#fff;border:1px solid var(--violet-l)}
 
-@media(max-width:900px){
-  .layout{grid-template-columns:1fr}
-  .docs-panel,.console-panel{display:none}
+/* Phones, small tablets and short landscape screens. The 52px one-line
+   topbar used to push Run/Stop/Home off-screen, and docs + console were
+   hidden. Now the bar wraps, the page scrolls, and every panel is reachable. */
+@media(max-width:900px),(orientation:landscape) and (max-height:560px){
+  html,body{height:auto;min-height:var(--vh-full,100vh);overflow-x:hidden;overflow-y:auto}
+  .topbar{height:auto;flex-wrap:wrap;padding:.5rem .75rem;row-gap:.45rem}
+  .topbar .sep{display:none}
+  .layout{display:flex;flex-direction:column;height:auto;overflow:visible}
+  .center-col{order:-1;overflow:visible}
+  .tracks-area{overflow:visible}
+  .docs-panel,.console-panel{display:flex;max-height:60vh;border:none;border-top:1px solid var(--border)}
+  .console-panel{order:0;height:40vh}
+  .docs-panel{order:1}
 }
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
 </head>
 <body>
 
@@ -329,6 +339,7 @@ html,body{height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;bac
 
   <button class="stop-btn" onclick="clearSession()" title="Clear saved session and reload defaults" style="font-size:.72rem;padding:.3rem .7rem;opacity:.6" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=.6">↺ Reset</button>
   <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+  <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link">✉ Contact</a>
 </div>
 
 <!-- ══ Layout ══════════════════════════════════════════════════════════ -->
@@ -415,6 +426,8 @@ html,body{height:100%;overflow:hidden;font-family:'Space Grotesk',sans-serif;bac
             <div class="doc-param"><span class="doc-param-name">'pad'</span><span class="doc-param-desc">Slow-attack pad — atmospheric</span></div>
             <div class="doc-param"><span class="doc-param-name">'bass'</span><span class="doc-param-desc">Fat triangle bass — one octave below</span></div>
             <div class="doc-param"><span class="doc-param-name">'pluck'</span><span class="doc-param-desc">Karplus-Strong pluck — guitar-like</span></div>
+            <div class="doc-param"><span class="doc-param-name">'guitar'</span><span class="doc-param-desc">Steel acoustic guitar samples (CC-BY)</span></div>
+            <div class="doc-param"><span class="doc-param-name">'epiano'</span><span class="doc-param-desc">Electric piano / Rhodes samples (CC-BY)</span></div>
           </div>
         </div>
 
@@ -882,6 +895,29 @@ const bassPoly = new Tone.PolySynth(Tone.Synth, {
   volume: -3,
 }).toDestination();
 
+// ── Extra sampled instruments from FluidR3_GM (CC-BY 3.0), loaded lazily on
+//    first use so they never slow the initial page load. ──
+const SF_BASE = 'https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/';
+const SF_ANCHORS = ['C2','Eb2','Gb2','A2','C3','Eb3','Gb3','A3','C4','Eb4','Gb4','A4','C5','Eb5','Gb5','A5','C6'];
+const sfInstruments = {
+  guitar: { folder: 'acoustic_guitar_steel', release: 0.8, sampler: null, ready: false },
+  epiano: { folder: 'electric_piano_1',      release: 1.2, sampler: null, ready: false },
+};
+function sfGet(name){
+  const d = sfInstruments[name];
+  if(!d) return null;
+  if(!d.sampler){
+    const urls = {};
+    SF_ANCHORS.forEach(n => { urls[n] = n + '.mp3'; });
+    d.sampler = new Tone.Sampler({
+      urls, baseUrl: SF_BASE + d.folder + '-mp3/', release: d.release,
+      onload: () => { d.ready = true; log(name + ' samples loaded ✓', 'ok'); },
+      onerror: () => log(name + ' samples failed — using synth fallback', 'err'),
+    }).connect(reverb);
+  }
+  return d;
+}
+
 // Drums
 const kick = new Tone.MembraneSynth({
   pitchDecay: 0.05, octaves: 7,
@@ -921,6 +957,13 @@ function triggerNote(instrument, midi, duration, velocity, time){
     case 'pad':   padPoly.triggerAttackRelease(note, dur, time, vel);   break;
     case 'bass':  bassPoly.triggerAttackRelease(midiToTone(Math.max(0,midi-12)), dur, time, vel); break;
     case 'pluck': pluckSynth.triggerAttackRelease(note, dur, time, vel); break;
+    case 'guitar':
+    case 'epiano': {
+      const d = sfGet(instrument);
+      if(d && d.ready) d.sampler.triggerAttackRelease(note, dur, time, vel);
+      else pluckSynth.triggerAttackRelease(note, dur, time, vel);  // fallback while loading
+      break;
+    }
   }
 }
 
@@ -942,7 +985,8 @@ function triggerDrum(drum, velocity, time){
 let allEvents = [], totalDuration = 0, rafId = null;
 
 const INST_COLORS = {
-  piano:'#34d399', synth:'#38bdf8', pad:'#a78bfa', bass:'#fbbf24', pluck:'#f472b6'
+  piano:'#34d399', synth:'#38bdf8', pad:'#a78bfa', bass:'#fbbf24', pluck:'#f472b6',
+  guitar:'#fb923c', epiano:'#2dd4bf'
 };
 const DRUM_COLORS = ['#ef4444','#fbbf24','#60a5fa','#34d399','#f472b6','#c084fc'];
 
@@ -1115,6 +1159,8 @@ function addTrack(opts = ''){
         <option value="pad"   ${inst==='pad'  ?'selected':''}>🌊 Pad</option>
         <option value="bass"  ${inst==='bass' ?'selected':''}>🎸 Bass</option>
         <option value="pluck" ${inst==='pluck'?'selected':''}>🪕 Pluck</option>
+        <option value="guitar" ${inst==='guitar'?'selected':''}>🎸 Guitar</option>
+        <option value="epiano" ${inst==='epiano'?'selected':''}>🎛 E-Piano</option>
       </select>
       ${id > 1 ? `<button class="track-remove" onclick="removeTrack(${id})" title="Remove track">✕</button>` : ''}
     </div>

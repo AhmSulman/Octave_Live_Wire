@@ -78,9 +78,11 @@ staticfiles/               # Output of collectstatic — do not edit directly
 | `/piano/` | `piano_learner_view` | backing_track_creator | `piano_learner.html` |
 | `/guitar/` | `guitar_fretboard_view` | backing_track_creator | `guitar_fretboard.html` |
 | `/backing-track/` | `backing_track_view` | backing_track_creator | `backing_track.html` |
+| `/contact/` | `contact_view` | backing_track_creator | `contact.html` |
 | `/api/analyze/` | `analyze_audio` (POST) | backing_track_creator | — |
 | `/api/fretboard/` | `get_fretboard_data` (GET) | backing_track_creator | — |
 | `/api/compose/` | `auto_compose` (POST) | backing_track_creator | — |
+| `/api/contact/` | `send_contact` (POST) | backing_track_creator | — |
 | `/pad/` | `pad_view` | pad | `pad.html` |
 | `/pad/run/` | `run_code` (POST) | pad | — |
 

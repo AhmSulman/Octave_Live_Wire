@@ -18,7 +18,7 @@
   --string1:#e0e0e8;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);height:100vh;height:var(--vh-full,100vh);display:flex;flex-direction:column;overflow:hidden}
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
   padding:.75rem 2rem;
@@ -31,7 +31,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .back-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.45rem 1.1rem;border-radius:999px;background:rgba(255,255,255,.07);border:1px solid var(--border);color:var(--muted);font-size:.85rem;text-decoration:none;transition:all .2s}
 .back-btn:hover{color:var(--text);background:rgba(255,255,255,.12)}
 
-.layout{flex:1;display:grid;grid-template-columns:260px 1fr;overflow:hidden}
+.layout{flex:1;display:grid;grid-template-columns:260px 1fr;overflow:hidden;min-height:0}
 
 /* Side panel */
 .side-panel{
@@ -225,13 +225,22 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .spinner{display:inline-block;width:12px;height:12px;border:2px solid rgba(255,255,255,.3);border-radius:50%;border-top-color:#fff;animation:spin .7s linear infinite}
 @keyframes spin{to{transform:rotate(360deg)}}
 
-@media(max-width:768px){
-  .layout{grid-template-columns:1fr}
-  .side-panel{display:none}
-  body{overflow:auto;height:auto}
+/* Phones and short landscape screens: fretboard first, settings stacked
+   below it (they used to be hidden, so tuning/scale couldn't be changed),
+   and the page scrolls instead of clipping. */
+@media(max-width:768px),(orientation:landscape) and (max-height:560px){
+  body{overflow-x:hidden;overflow-y:auto;height:auto;min-height:var(--vh-full,100vh)}
+  .topbar{padding:.5rem .9rem;flex-wrap:wrap;gap:.5rem}
+  .logo{font-size:.95rem}
+  .back-btn,.olw-contact-link{padding:.35rem .8rem;font-size:.78rem}
+  .layout{display:flex;flex-direction:column;overflow:visible}
+  .fretboard-area{order:-1;overflow:visible;padding:.7rem .5rem}
+  .fretboard-scroll{flex:none;padding-bottom:.4rem}
+  .side-panel{overflow:visible;border-right:none;border-top:1px solid var(--border)}
 }
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
+{% include "backing_track_creator/_soundfont.html" %}
 </head>
 <body>
 <div class="topbar">
@@ -239,6 +248,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
   <div style="display:flex;gap:.7rem;align-items:center">
     <a href="{% url 'backing_track_creator:piano_learner' %}" class="back-btn">🎹 Piano</a>
     <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+    <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link">✉ Contact</a>
   </div>
 </div>
 
@@ -311,6 +321,9 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
       <div class="panel-title">Quick Chords</div>
       <div style="display:flex;flex-direction:column;gap:.4rem" id="quickChords"></div>
     </div>
+    <div style="font-size:.62rem;color:var(--muted);line-height:1.5;margin-top:auto;padding-top:.5rem">
+      Guitar samples: <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener" style="color:var(--green-l)">FluidR3_GM</a> · CC-BY 3.0
+    </div>
   </div>
 
   <!-- Fretboard Area -->
@@ -322,6 +335,16 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
           {% for t in tunings %}
           <option value="{{ t.name }}" {% if t.name == current_tuning.name %}selected{% endif %}>{{ t.display }}</option>
           {% endfor %}
+        </select>
+      </div>
+      <div class="fb-ctrl-group">
+        <span class="fb-ctrl-label">Sound:</span>
+        <select class="fb-select" id="guitarInst" onchange="changeGuitar()">
+          <option value="steel">🎸 Acoustic Steel</option>
+          <option value="nylon">🎸 Nylon (Classical)</option>
+          <option value="clean">🎸 Electric Clean</option>
+          <option value="jazz">🎸 Jazz</option>
+          <option value="overdrive">🎸 Overdrive</option>
         </select>
       </div>
       <div class="fb-ctrl-group">
@@ -458,14 +481,43 @@ function playOscillatorFallback(noteStr){
   });
 }
 
+// ── Real guitar samples (FluidR3_GM, CC-BY 3.0); falls back to WAV/oscillator ──
+const GUITAR_INSTRUMENTS = {
+  steel:     'acoustic_guitar_steel',
+  nylon:     'acoustic_guitar_nylon',
+  clean:     'electric_guitar_clean',
+  jazz:      'electric_guitar_jazz',
+  overdrive: 'overdriven_guitar',
+};
+let sfSampler = null;
+function ensureSampler(){
+  if(!sfSampler){
+    const sel = document.getElementById('guitarInst');
+    const gm = GUITAR_INSTRUMENTS[(sel && sel.value) || 'steel'] || GUITAR_INSTRUMENTS.steel;
+    sfSampler = new OLWSampler(gm, {minOct:2, maxOct:6, release:0.5, gain:1.0});
+    sfSampler.attach(audioCtx);
+    sfSampler.load();
+  }
+}
+function changeGuitar(){
+  if(!audioCtx){ audioCtx = new (window.AudioContext || window.webkitAudioContext)(); decodePending(); }
+  ensureSampler();
+  const gm = GUITAR_INSTRUMENTS[document.getElementById('guitarInst').value] || GUITAR_INSTRUMENTS.steel;
+  sfSampler.setInstrument(gm);
+}
+
 function playFretTone(noteStr){
   if(!audioCtx){
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     decodePending(); // async, doesn't block
   }
   if(audioCtx.state === 'suspended') audioCtx.resume();
+  ensureSampler();
 
-  // Best case: exact decoded buffer
+  // Best case: real sampled guitar for this note
+  if(sfSampler.play(noteToMidi(noteStr), {duration: 1.6, velocity: 0.85})) return;
+
+  // Next: exact decoded piano buffer
   if(pianoBuffers.has(noteStr)){ playSampleBuf(pianoBuffers.get(noteStr)); return; }
 
   // Note was fetched but not yet decoded — decode it now and play immediately

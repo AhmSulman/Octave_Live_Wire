@@ -15,7 +15,7 @@
   --text:#f1f5f9;--muted:#64748b;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column;overflow:hidden}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);height:100vh;height:var(--vh-full,100vh);display:flex;flex-direction:column;overflow:hidden}
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
   padding:.75rem 2rem;
@@ -31,7 +31,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .content{
   flex:1;display:grid;
   grid-template-columns:280px 1fr 280px;
-  gap:0;overflow:hidden;
+  gap:0;overflow:hidden;min-height:0;
 }
 
 /* ── Side panels ── */
@@ -52,7 +52,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
   display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
   padding:1rem 1.5rem 1.2rem;
   background:linear-gradient(to bottom,rgba(3,7,18,.3),rgba(3,7,18,.8));
-  position:relative;overflow:hidden;
+  position:relative;overflow-x:hidden;overflow-y:auto;min-width:0;min-height:0;
 }
 /* Ambient glow behind piano */
 .piano-area::before{
@@ -79,11 +79,25 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 
 /* ── Piano keyboard ── */
 .piano-wrapper{
-  width:100%;overflow-x:auto;
+  width:100%;overflow-x:auto;overflow-y:hidden;
   padding-bottom:.5rem;
+  -webkit-overflow-scrolling:touch;
 }
-.piano-wrapper::-webkit-scrollbar{height:4px}
-.piano-wrapper::-webkit-scrollbar-thumb{background:rgba(255,255,255,.1);border-radius:2px}
+/* Centre the keyboard when it fits; scroll from the left edge when it doesn't */
+.piano-wrapper.fits{display:flex;justify-content:center}
+.kb-row{width:100%;display:flex;align-items:center;gap:.4rem}
+.kb-row .piano-wrapper{flex:1;min-width:0}
+.kb-nav{display:none;flex-shrink:0;width:34px;height:64px;border-radius:8px;border:1px solid var(--border);
+  background:rgba(255,255,255,.08);color:var(--text);font-size:1rem;cursor:pointer}
+.kb-row.overflowing .kb-nav{display:inline-flex;align-items:center;justify-content:center}
+.kb-nav:active{background:rgba(190,24,93,.35)}
+
+/* Phone-only helpers */
+.rotate-hint{display:none;width:100%;margin-bottom:.6rem;padding:.55rem .8rem;border-radius:10px;
+  background:rgba(217,119,6,.12);border:1px solid rgba(217,119,6,.35);color:var(--gold-l);
+  font-size:.78rem;text-align:center}
+.fs-btn{display:none}
+.touch .fs-btn.supported{display:inline-flex}
 
 .piano{
   display:inline-flex;
@@ -97,7 +111,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 }
 
 .key-w{
-  width:48px;height:200px;
+  width:var(--kw,48px);height:var(--kh,200px);
   background:linear-gradient(to bottom,#f5f5f0 0%,#e8e8e0 70%,#ddd 100%);
   border:1px solid #bbb;border-radius:0 0 6px 6px;
   position:relative;cursor:pointer;
@@ -119,7 +133,7 @@ body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--tex
 .key-w.root-note{background:linear-gradient(to bottom,#ffd700,#ffa500) !important;color:#333}
 
 .key-b{
-  width:32px;height:130px;
+  width:var(--bw,32px);height:var(--bh,130px);
   background:linear-gradient(to bottom,#222 0%,#111 60%,#000 100%);
   border:1px solid #000;border-radius:0 0 5px 5px;
   position:absolute;z-index:2;cursor:pointer;
@@ -234,14 +248,31 @@ textarea.melody-input::placeholder{color:var(--muted)}
   .content{grid-template-columns:220px 1fr}
   .side-panel:last-child{display:none}
 }
-@media(max-width:640px){
-  .content{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-  body{overflow:auto}
-  .side-panel:first-child{max-height:none}
-  .piano-area{justify-content:flex-start;padding-top:1rem}
+/* Phones (portrait) and any short landscape screen: keyboard first, panels
+   stacked below it, and the whole page scrolls instead of being clipped. */
+@media(max-width:760px),(orientation:landscape) and (max-height:560px){
+  body{height:auto;min-height:var(--vh-full,100vh);overflow-x:hidden;overflow-y:auto}
+  .topbar{padding:.5rem .9rem;flex-wrap:wrap;gap:.5rem}
+  .logo{font-size:.95rem}
+  .back-btn,.olw-contact-link{padding:.35rem .8rem;font-size:.78rem}
+  .content{display:flex;flex-direction:column;overflow:visible}
+  .piano-area{order:-1;overflow:visible;justify-content:flex-start;padding:.7rem .5rem 1rem}
+  .side-panel{overflow:visible;border:none!important;border-top:1px solid var(--border)!important}
+  .side-panel:last-child{display:flex}
+}
+@media(max-width:760px) and (orientation:portrait){
+  .rotate-hint{display:block}
+}
+@media(orientation:landscape) and (max-height:560px){
+  .piano-info-bar{margin-bottom:.35rem;gap:1rem}
+  .piano-info-bar .lbl{display:none}
+  .note-display{font-size:1.3rem;min-height:1.6rem}
+  .chord-display{padding:.2rem .7rem}
+  .piano-controls{margin-top:.4rem;padding:.4rem .6rem;gap:.7rem}
 }
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
+{% include "backing_track_creator/_soundfont.html" %}
 </head>
 <body>
 <div class="topbar">
@@ -249,6 +280,7 @@ textarea.melody-input::placeholder{color:var(--muted)}
   <div style="display:flex;gap:.7rem;align-items:center">
     <a href="{% url 'backing_track_creator:guitar_fretboard' %}" class="back-btn">🎸 Guitar</a>
     <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+    <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link">✉ Contact</a>
   </div>
 </div>
 
@@ -298,24 +330,38 @@ textarea.melody-input::placeholder{color:var(--muted)}
 
   <!-- Piano Center -->
   <div class="piano-area">
+    <div class="rotate-hint" id="rotateHint">↻ Turn your phone sideways for the full keyboard</div>
     <div class="piano-info-bar">
       <div style="text-align:center">
-        <div style="font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">Now Playing</div>
+        <div class="lbl" style="font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">Now Playing</div>
         <div class="note-display" id="noteDisplay">—</div>
       </div>
       <div style="text-align:center">
-        <div style="font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">Chord</div>
+        <div class="lbl" style="font-size:.65rem;color:var(--muted);letter-spacing:.1em;text-transform:uppercase;margin-bottom:.3rem">Chord</div>
         <div class="chord-display" id="chordDisplayBar">None</div>
       </div>
     </div>
 
-    <div class="piano-wrapper">
-      <div class="piano" id="piano">
-        <!-- JS renders keys -->
+    <div class="kb-row" id="kbRow">
+      <button class="kb-nav" type="button" aria-label="Scroll keyboard left" onclick="scrollKeys(-1)">◀</button>
+      <div class="piano-wrapper" id="pianoWrapper">
+        <div class="piano" id="piano">
+          <!-- JS renders keys -->
+        </div>
       </div>
+      <button class="kb-nav" type="button" aria-label="Scroll keyboard right" onclick="scrollKeys(1)">▶</button>
     </div>
 
     <div class="piano-controls">
+      <div class="ctrl-group">
+        <label class="ctrl-label">Instrument</label>
+        <select class="select-styled" id="instSelect" onchange="changeInstrument()" style="padding:.35rem .6rem;font-size:.78rem;width:auto">
+          <option value="grand">🎹 Grand Piano</option>
+          <option value="electric">🎛 Electric Piano</option>
+          <option value="harpsi">🎼 Harpsichord</option>
+          <option value="musicbox">🔔 Music Box</option>
+        </select>
+      </div>
       <div class="ctrl-group">
         <label class="ctrl-label">Volume</label>
         <input type="range" class="mini-slider" id="volCtrl" min="0" max="1" value="0.7" step="0.01">
@@ -335,6 +381,10 @@ textarea.melody-input::placeholder{color:var(--muted)}
       <div class="ctrl-group">
         <label class="ctrl-label">Show Labels</label>
         <button class="btn btn-muted" style="padding:.4rem .9rem;width:auto" id="labelToggleBtn" onclick="toggleLabels()">ON</button>
+      </div>
+      <div class="ctrl-group fs-btn" id="fsGroup">
+        <label class="ctrl-label">Full Screen</label>
+        <button class="btn btn-muted" style="padding:.4rem .9rem;width:auto" id="fsBtn" onclick="toggleFullscreen()">⛶ Landscape</button>
       </div>
     </div>
   </div>
@@ -373,6 +423,9 @@ textarea.melody-input::placeholder{color:var(--muted)}
     <div>
       <div class="panel-title">Recent Notes</div>
       <div id="recentNotes" style="display:flex;flex-wrap:wrap;gap:.4rem"></div>
+    </div>
+    <div style="font-size:.62rem;color:var(--muted);line-height:1.5;margin-top:.3rem">
+      Instrument samples: <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener" style="color:var(--pink-l)">FluidR3_GM</a> · CC-BY 3.0
     </div>
   </div>
 </div>
@@ -430,14 +483,44 @@ function createReverb(ctx){
 
 let reverbNode = null;
 
+// ── Sampled instruments (FluidR3_GM, CC-BY 3.0) with oscillator fallback ──
+const PIANO_INSTRUMENTS = {
+  grand:    'acoustic_grand_piano',
+  electric: 'electric_piano_1',
+  harpsi:   'harpsichord',
+  musicbox: 'music_box',
+};
+let sfSampler = null;
+function ensureSampler(){
+  if(!sfSampler){
+    const sel = document.getElementById('instSelect');
+    const gm = PIANO_INSTRUMENTS[(sel && sel.value) || 'grand'] || PIANO_INSTRUMENTS.grand;
+    sfSampler = new OLWSampler(gm, {release:0.6, gain:0.9});
+    sfSampler.attach(getCtx());
+    sfSampler.load();
+  }
+}
+function changeInstrument(){
+  const gm = PIANO_INSTRUMENTS[document.getElementById('instSelect').value] || PIANO_INSTRUMENTS.grand;
+  ensureSampler();
+  sfSampler.setInstrument(gm);
+}
+
 function playNote(note, octave){
   const ctx = getCtx();
+  ensureSampler();
+  const midi = noteToMidi(note, octave);
+  const vol = parseFloat(document.getElementById('volCtrl').value);
+
+  // Preferred: real sampled instrument. Falls back to the synth below.
+  const sampled = sfSampler.play(midi, {velocity: vol, duration: 1.8});
+
+  if(!sampled){
   if(!reverbNode){
     reverbNode = createReverb(ctx);
     reverbNode.connect(ctx.destination);
   }
-  const freq = midiToFreq(noteToMidi(note, octave));
-  const vol = parseFloat(document.getElementById('volCtrl').value);
+  const freq = midiToFreq(midi);
   const rev = parseFloat(document.getElementById('reverbCtrl').value);
 
   // Main piano-like tone: multiple harmonics
@@ -475,6 +558,7 @@ function playNote(note, octave){
     osc.start(ctx.currentTime);
     osc.stop(ctx.currentTime + 2.2);
   });
+  } // end oscillator fallback
 
   // Visual
   const keyEl = document.querySelector(`[data-noteid="${note}${octave}"]`);
@@ -542,11 +626,10 @@ function buildPiano(){
       if(showLabels) hint.textContent = bName.slice(0,2);
       div.appendChild(hint);
 
-      // Position black key relative to piano
-      // Each white key = 49px (48px + 1px gap effectively), black key center at (wIdx+1) * 49 - 16px
-      const allWhitesBefore = OCTAVES.indexOf(oct) * 7 + wIdx;
-      const leftPx = allWhitesBefore * 49 + 49 - 16 + 8; // 8px piano padding
-      div.style.left = leftPx + 'px';
+      // Black key sits on the boundary after white key #wpos (0-based, across
+      // all octaves). Its pixel position is set by layoutPiano(), so it follows
+      // the key width when the screen size or orientation changes.
+      div.dataset.wpos = OCTAVES.indexOf(oct) * 7 + wIdx;
       div.style.top = '8px';
 
       div.addEventListener('mousedown', e => { e.stopPropagation(); playNote(bName, oct); });
@@ -554,7 +637,113 @@ function buildPiano(){
       piano.appendChild(div);
     });
   });
+  layoutPiano();
 }
+
+// ── Responsive keyboard sizing (re-runs on resize / rotation) ──
+const WHITE_COUNT = OCTAVES.length * 7;
+const isTouch = window.matchMedia('(pointer:coarse)').matches || 'ontouchstart' in window;
+if(isTouch) document.documentElement.classList.add('touch');
+
+function layoutPiano(){
+  const piano = document.getElementById('piano');
+  const wrap = document.getElementById('pianoWrapper');
+  const row = document.getElementById('kbRow');
+  if(!piano || !wrap) return;
+  const vw = window.innerWidth, vh = window.innerHeight;
+  const shortLandscape = vw > vh && vh <= 560;
+
+  // Width available for the keys (piano has 8px padding each side)
+  row.classList.remove('overflowing');
+  const avail = wrap.clientWidth - 18;
+  const fitKw = Math.floor(avail / WHITE_COUNT);
+  // Never shrink keys below a playable finger width; scroll instead.
+  const minKw = isTouch ? 34 : 26;
+  const kw = Math.max(minKw, Math.min(48, fitKw));
+
+  // Height: in phone landscape, fill whatever is left of the screen.
+  let kh = Math.round(Math.min(200, Math.max(120, kw * 4.2)));
+  if(shortLandscape){
+    const used = (document.querySelector('.topbar')?.offsetHeight || 0)
+               + (document.querySelector('.piano-info-bar')?.offsetHeight || 0)
+               + (document.querySelector('.piano-controls')?.offsetHeight || 0) + 48;
+    kh = Math.round(Math.min(200, Math.max(100, vh - used)));
+  }
+  const bw = Math.round(kw * 0.66), bh = Math.round(kh * 0.64);
+
+  piano.style.setProperty('--kw', kw + 'px');
+  piano.style.setProperty('--kh', kh + 'px');
+  piano.style.setProperty('--bw', bw + 'px');
+  piano.style.setProperty('--bh', bh + 'px');
+  piano.querySelectorAll('.key-b').forEach(b => {
+    b.style.left = (8 + (Number(b.dataset.wpos) + 1) * kw - bw / 2) + 'px';
+  });
+
+  const overflowing = piano.scrollWidth > wrap.clientWidth + 2;
+  wrap.classList.toggle('fits', !overflowing);
+  row.classList.toggle('overflowing', overflowing);
+  if(overflowing && !layoutPiano._scrolled){
+    // Start the view on middle C rather than the far-left C3.
+    const c4 = piano.querySelector('[data-noteid="C4"]');
+    if(c4) wrap.scrollLeft = c4.offsetLeft - 8;
+    layoutPiano._scrolled = true;
+  }
+  if(!overflowing) layoutPiano._scrolled = false;
+}
+
+function scrollKeys(dir){
+  const wrap = document.getElementById('pianoWrapper');
+  const kw = parseFloat(getComputedStyle(document.getElementById('piano')).getPropertyValue('--kw')) || 40;
+  wrap.scrollBy({left: dir * kw * 7, behavior: 'smooth'});
+}
+
+let _layoutTimer = null;
+function scheduleLayout(){
+  clearTimeout(_layoutTimer);
+  // Some phones report the old size during the rotation event; settle first.
+  _layoutTimer = setTimeout(layoutPiano, 120);
+}
+window.addEventListener('resize', scheduleLayout);
+window.addEventListener('orientationchange', () => { layoutPiano._scrolled = false; scheduleLayout(); });
+if(screen.orientation && screen.orientation.addEventListener){
+  screen.orientation.addEventListener('change', () => { layoutPiano._scrolled = false; scheduleLayout(); });
+}
+if(window.ResizeObserver){
+  new ResizeObserver(scheduleLayout).observe(document.getElementById('pianoWrapper'));
+}
+
+// ── Full screen + landscape lock (Android Chrome etc.; iPhone has no API) ──
+const fsSupported = !!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen);
+if(fsSupported) document.getElementById('fsGroup').classList.add('supported');
+
+async function toggleFullscreen(){
+  const btn = document.getElementById('fsBtn');
+  const inFs = document.fullscreenElement || document.webkitFullscreenElement;
+  try{
+    if(inFs){
+      if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock();
+      await (document.exitFullscreen ? document.exitFullscreen() : document.webkitExitFullscreen());
+    } else {
+      const el = document.documentElement;
+      await (el.requestFullscreen ? el.requestFullscreen({navigationUI:'hide'}) : el.webkitRequestFullscreen());
+      if(screen.orientation && screen.orientation.lock){
+        await screen.orientation.lock('landscape').catch(() => {
+          showToast('Rotate your phone sideways for the full keyboard', 'info');
+        });
+      }
+    }
+  } catch(e){
+    showToast('Rotate your phone sideways for the full keyboard', 'info');
+  }
+  setTimeout(() => {
+    btn.textContent = (document.fullscreenElement || document.webkitFullscreenElement) ? '✕ Exit' : '⛶ Landscape';
+    layoutPiano._scrolled = false; layoutPiano();
+  }, 300);
+}
+document.addEventListener('fullscreenchange', () => {
+  document.getElementById('fsBtn').textContent = document.fullscreenElement ? '✕ Exit' : '⛶ Landscape';
+  scheduleLayout();
+});
 
 // ── Scale highlighting ──
 const SCALE_INTERVALS = {

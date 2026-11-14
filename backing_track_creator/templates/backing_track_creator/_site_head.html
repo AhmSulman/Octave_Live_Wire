@@ -1,0 +1,28 @@
+<style>
+/* ── Site-wide fixes (shared) ───────────────────────────────────────────── */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* Real visible-viewport height on phones (100vh is taller than the screen
+   when the browser toolbar is showing). Pages use var(--vh-full). */
+:root{--vh-full:100vh}
+@supports(height:100dvh){:root{--vh-full:100dvh}}
+
+/* Visible scrollbars: the per-page 3–4px near-transparent thumbs were
+   effectively invisible. !important beats the page-level selectors. */
+*::-webkit-scrollbar{width:10px!important;height:10px!important}
+*::-webkit-scrollbar-track{background:rgba(255,255,255,.04)!important}
+*::-webkit-scrollbar-thumb{background:rgba(167,139,250,.55)!important;border-radius:6px!important;border:2px solid transparent!important;background-clip:padding-box!important}
+*::-webkit-scrollbar-thumb:hover{background:rgba(196,181,253,.85)!important;background-clip:padding-box!important}
+*::-webkit-scrollbar-corner{background:transparent!important}
+@supports not selector(::-webkit-scrollbar){
+  *{scrollbar-width:auto;scrollbar-color:rgba(167,139,250,.6) rgba(255,255,255,.04)}
+}
+
+/* Contact link shown in every page's top bar */
+.olw-contact-link{display:inline-flex;align-items:center;gap:.35rem;padding:.45rem 1rem;border-radius:999px;
+  background:linear-gradient(135deg,rgba(124,58,237,.35),rgba(8,145,178,.3));border:1px solid rgba(167,139,250,.4);
+  color:#f1f5f9;font-size:.85rem;font-weight:600;text-decoration:none;white-space:nowrap;transition:background .2s}
+.olw-contact-link:hover,.olw-contact-link:focus-visible{background:linear-gradient(135deg,rgba(124,58,237,.6),rgba(8,145,178,.5))}
+</style>
+{% comment %}Vercel Web Analytics (plain-HTML install). Only records on Vercel once Analytics is enabled for the project in the dashboard.{% endcomment %}
+<script>window.va=window.va||function(){(window.vaq=window.vaq||[]).push(arguments)};</script>
+<script defer src="/_vercel/insights/script.js"></script>

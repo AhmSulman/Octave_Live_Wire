@@ -6,6 +6,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from django.conf import settings
+from django.core.mail import EmailMessage
+from django.core.validators import validate_email
+from django.core.exceptions import ValidationError
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -95,9 +98,91 @@ def backing_track_view(request: HttpRequest) -> HttpResponse:
     return render(request, "backing_track_creator/backing_track.html")
 
 
+# Public profiles shown on the contact page (and linked from the portfolio).
+PUBLIC_LINKS = [
+    {"name": "Portfolio", "handle": "ahmed-salman.vercel.app", "url": "https://ahmed-salman.vercel.app/", "icon": "🌐"},
+    {"name": "GitHub", "handle": "@AhmSulman", "url": "https://github.com/AhmSulman", "icon": "💻"},
+    {"name": "LinkedIn", "handle": "ahmed-salman-maan", "url": "https://www.linkedin.com/in/ahmed-salman-maan", "icon": "💼"},
+    {"name": "YouTube", "handle": "@Ahm3dSulman", "url": "https://www.youtube.com/@Ahm3dSulman", "icon": "▶️"},
+]
+
+
+@ensure_csrf_cookie
+@require_GET
+def contact_view(request: HttpRequest) -> HttpResponse:
+    return render(request, "backing_track_creator/contact.html", {"links": PUBLIC_LINKS})
+
+
 # ---------------------------------------------------------------------------
 # API endpoints
 # ---------------------------------------------------------------------------
+_CONTACT_LIMITS = {"name": 100, "email": 254, "subject": 150, "message": 5000}
+
+
+@require_http_methods(["POST"])
+def send_contact(request: HttpRequest) -> JsonResponse:
+    """Deliver a contact-form message to settings.CONTACT_EMAIL over SMTP."""
+    try:
+        data = json.loads(request.body or b"{}")
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse({"success": False, "error": "Invalid request."}, status=400)
+    if not isinstance(data, dict):
+        return JsonResponse({"success": False, "error": "Invalid request."}, status=400)
+
+    # Honeypot: real visitors never see or fill the "website" field.
+    if str(data.get("website", "")).strip():
+        return JsonResponse({"success": True})
+
+    fields = {k: str(data.get(k, "")).strip() for k in _CONTACT_LIMITS}
+    errors = {}
+    if not fields["name"]:
+        errors["name"] = "Please enter your name."
+    if not fields["message"] or len(fields["message"]) < 10:
+        errors["message"] = "Please write a message (at least 10 characters)."
+    try:
+        validate_email(fields["email"])
+    except ValidationError:
+        errors["email"] = "Please enter a valid email address."
+    for k, limit in _CONTACT_LIMITS.items():
+        if len(fields[k]) > limit:
+            errors[k] = f"Too long (max {limit} characters)."
+    # Header-injection guard for anything that ends up in a mail header.
+    for k in ("name", "email", "subject"):
+        if "\n" in fields[k] or "\r" in fields[k]:
+            errors[k] = "Invalid characters."
+    if errors:
+        return JsonResponse({"success": False, "errors": errors}, status=400)
+
+    recipient = getattr(settings, "CONTACT_EMAIL", "")
+    backend = getattr(settings, "EMAIL_BACKEND", "")
+    smtp_ready = bool(settings.EMAIL_HOST_USER and settings.EMAIL_HOST_PASSWORD)
+    if not recipient or (not smtp_ready and "smtp" in backend.lower()):
+        return JsonResponse({
+            "success": False,
+            "error": "The contact form isn't set up yet. Please reach me through one of the links on this page.",
+        }, status=503)
+
+    subject = fields["subject"] or "New message"
+    body = (
+        f"From: {fields['name']} <{fields['email']}>\n"
+        "Sent via the Octave Live Wire contact page\n"
+        f"{'-' * 48}\n\n{fields['message']}\n"
+    )
+    msg = EmailMessage(
+        subject=f"[Octave Live Wire] {subject}",
+        body=body,
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[recipient],
+        reply_to=[f"{fields['name']} <{fields['email']}>"],
+    )
+    try:
+        msg.send(fail_silently=False)
+    except Exception:
+        return JsonResponse({
+            "success": False,
+            "error": "Sorry, the message couldn't be sent right now. Please try again or use one of the links on this page.",
+        }, status=502)
+    return JsonResponse({"success": True})
 @require_GET
 def get_fretboard_data(request: HttpRequest) -> JsonResponse:
     tuning_key = request.GET.get("tuning", "standard")
@@ -105,7 +190,11 @@ def get_fretboard_data(request: HttpRequest) -> JsonResponse:
         tuning_key = "standard"
 
     tuning = GUITAR_TUNINGS[tuning_key]
-    frets = int(request.GET.get("frets", 17))
+    try:
+        frets = int(request.GET.get("frets", 17))
+    except (TypeError, ValueError):
+        frets = 17
+    frets = max(1, min(frets, 36))  # clamp: no crash, no unbounded response
     strings_data = []
 
     for open_note in reversed(tuning["strings"]):
@@ -125,20 +214,44 @@ def get_fretboard_data(request: HttpRequest) -> JsonResponse:
     })
 
 
+MAX_AUDIO_BYTES = 30 * 1024 * 1024  # 30 MB
+ALLOWED_AUDIO_EXTS = frozenset({".wav", ".mp3", ".flac", ".ogg", ".m4a", ".aac", ".aiff", ".aif"})
+
+
 @require_http_methods(["POST"])
 def analyze_audio(request: HttpRequest) -> JsonResponse:
     up = request.FILES.get("file")
     if not up:
         return JsonResponse({"success": False, "error": "No file uploaded"}, status=400)
 
+    # Reject oversized or non-audio uploads before writing to disk / decoding.
+    if up.size and up.size > MAX_AUDIO_BYTES:
+        return JsonResponse(
+            {"success": False, "error": "File too large (max 30 MB)."}, status=413
+        )
+    safe_name = Path(up.name).name
+    if Path(safe_name).suffix.lower() not in ALLOWED_AUDIO_EXTS:
+        return JsonResponse(
+            {"success": False, "error": "Unsupported file type. Upload an audio file."},
+            status=415,
+        )
+
     upload_dir = _media_root() / "uploads"
     upload_dir.mkdir(parents=True, exist_ok=True)
 
-    safe_name = Path(up.name).name
     dest = upload_dir / f"{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}_{safe_name}"
 
+    written = 0
     with dest.open("wb") as f:
         for chunk in up.chunks():
+            written += len(chunk)
+            if written > MAX_AUDIO_BYTES:  # guard streamed/chunked uploads too
+                f.close()
+                dest.unlink(missing_ok=True)
+                return JsonResponse(
+                    {"success": False, "error": "File too large (max 30 MB)."},
+                    status=413,
+                )
             f.write(chunk)
 
     try:
@@ -171,8 +284,18 @@ def analyze_audio(request: HttpRequest) -> JsonResponse:
             "waveform": result["waveform_data"],
             "waveform_image": result.get("waveform_image", ""),
         })
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=500)
+    except Exception:
+        # Don't leak internal/library error details to the client.
+        return JsonResponse(
+            {"success": False, "error": "Could not analyze this file. Please try another audio file."},
+            status=500,
+        )
+    finally:
+        # The upload is only needed during analysis; don't leave it on disk.
+        try:
+            dest.unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 CHORD_PROGRESSIONS = {
@@ -240,9 +363,11 @@ CHORD_PROGRESSIONS = {
 def auto_compose(request: HttpRequest) -> JsonResponse:
     try:
         payload = json.loads(request.body.decode("utf-8") or "{}")
-        genre = payload.get("genre", "rock").lower()
-        key = payload.get("key", "A")
-        tonality = payload.get("tonality", "minor")
+        if not isinstance(payload, dict):
+            payload = {}
+        genre = str(payload.get("genre", "rock")).lower()
+        key = str(payload.get("key", "A"))
+        tonality = str(payload.get("tonality", "minor"))
 
         genre_data = CHORD_PROGRESSIONS.get(genre, CHORD_PROGRESSIONS["rock"])
         tonality_data = genre_data.get(tonality, genre_data.get("major", {}))
@@ -272,5 +397,5 @@ def auto_compose(request: HttpRequest) -> JsonResponse:
             "key": key,
             "tonality": tonality,
         })
-    except Exception as e:
-        return JsonResponse({"success": False, "error": str(e)}, status=400)
+    except Exception:
+        return JsonResponse({"success": False, "error": "Could not compose. Please try again."}, status=400)

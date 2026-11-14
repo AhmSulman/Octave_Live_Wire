@@ -15,7 +15,7 @@
   --red:#dc2626;--text:#f1f5f9;--muted:#64748b;
 }
 *{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;display:flex;flex-direction:column}
+body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;min-height:var(--vh-full,100vh);display:flex;flex-direction:column}
 .topbar{
   display:flex;align-items:center;justify-content:space-between;
   padding:.75rem 2rem;background:rgba(3,7,18,.9);backdrop-filter:blur(20px);
@@ -304,10 +304,29 @@ input[type=range].fader.piano-fader::-webkit-slider-thumb{background:var(--pink-
 .rec-dot.active{background:var(--red);box-shadow:0 0 8px rgba(220,38,38,.6);animation:recPulse 1s ease-in-out infinite}
 @keyframes recPulse{0%,100%{opacity:1}50%{opacity:.4}}
 
-@media(max-width:1024px){.studio{grid-template-columns:220px 1fr}}
-@media(max-width:768px){.studio{grid-template-columns:1fr};.right-panel,.left-panel{display:none}}
+/* Tablet: two columns, right panel drops to a full-width row underneath */
+@media(max-width:1024px){
+  .studio{grid-template-columns:220px minmax(0,1fr)}
+  .right-panel{grid-column:1/-1;border-left:none;border-top:1px solid var(--border)}
+}
+/* Phones and short landscape screens: one scrolling column, studio first.
+   (The old rule had a stray ';' that broke it.) */
+@media(max-width:768px),(orientation:landscape) and (max-height:560px){
+  .topbar{padding:.5rem .9rem;flex-wrap:wrap;gap:.5rem}
+  .topbar > div:last-child{flex-wrap:wrap}
+  .logo{font-size:.9rem}
+  .back-btn,.olw-contact-link{padding:.35rem .8rem;font-size:.78rem}
+  .studio{display:flex;flex-direction:column;overflow:visible}
+  .center-studio{order:-1;overflow:visible;padding:.8rem .6rem}
+  .left-panel,.right-panel{overflow:visible;border:none;border-top:1px solid var(--border)}
+  /* Keep the 16 steps tappable: scroll sideways instead of squashing */
+  .sequencer-section{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  .drum-track,.beat-indicator-row,.step-col{min-width:600px}
+  .seq-header{flex-wrap:wrap;gap:.5rem;position:sticky;left:0}
+}
 </style>
-<script defer src="https://cdn.vercel-analytics.com/v1/script.js"></script>
+{% include "backing_track_creator/_site_head.html" %}
+{% include "backing_track_creator/_soundfont.html" %}
 </head>
 <body>
 <div class="topbar">
@@ -317,6 +336,7 @@ input[type=range].fader.piano-fader::-webkit-slider-thumb{background:var(--pink-
     <span id="statusText" style="font-size:.78rem;color:var(--muted);font-family:'Orbitron',sans-serif">STOPPED</span>
     <a href="{% url 'backing_track_creator:guitar_fretboard' %}" class="back-btn">🎸 Guitar</a>
     <a href="{% url 'backing_track_creator:home' %}" class="back-btn">← Home</a>
+    <a href="{% url 'backing_track_creator:contact' %}" class="olw-contact-link">✉ Contact</a>
   </div>
 </div>
 
@@ -461,12 +481,17 @@ input[type=range].fader.piano-fader::-webkit-slider-thumb{background:var(--pink-
     </div>
 
     <div>
-      <div class="panel-title">Piano Sound</div>
+      <div class="panel-title">Lead / Chord Sound</div>
       <select class="select-styled" id="pianoSound">
-        <option value="synth">Synthesizer</option>
-        <option value="electric">Electric Piano</option>
-        <option value="organ">Organ</option>
+        <option value="piano">🎹 Grand Piano</option>
+        <option value="electric">🎛 Electric Piano</option>
+        <option value="organ">🎵 Organ</option>
+        <option value="strings">🎻 Strings</option>
+        <option value="synth">🌊 Synth</option>
       </select>
+      <div style="font-size:.6rem;color:var(--muted);line-height:1.5;margin-top:.4rem">
+        Samples: <a href="https://github.com/gleitz/midi-js-soundfonts" target="_blank" rel="noopener" style="color:var(--gold-l)">FluidR3_GM</a> · CC-BY 3.0
+      </div>
     </div>
 
     <div>
@@ -644,9 +669,42 @@ function noteToFreq(n){
   return 440*Math.pow(2,((oct+1)*12+idx-69)/12);
 }
 
+// ── Sampled lead/chord instruments (FluidR3_GM, CC-BY 3.0) ──
+const BT_INSTRUMENTS = {
+  piano:    'acoustic_grand_piano',
+  electric: 'electric_piano_1',
+  organ:    'drawbar_organ',
+  strings:  'string_ensemble_1',
+  // 'synth' intentionally omitted → always uses the oscillator voice below
+};
+const btSamplers = {};  // gm name -> OLWSampler
+function btSampler(){
+  const type = document.getElementById('pianoSound').value;
+  const gm = BT_INSTRUMENTS[type];
+  if(!gm) return null;                       // 'synth' → oscillator
+  if(!btSamplers[gm]){
+    const s = new OLWSampler(gm, {minOct:2, maxOct:6, release:0.5, gain:0.9});
+    s.attach(getCtx());
+    s.load();
+    btSamplers[gm] = s;
+  }
+  return btSamplers[gm];
+}
+function noteToMidiBT(n){
+  const flat=n.replace('#','').trim(); let name,oct;
+  if(flat.length>=3&&flat[1]==='b'){name=flat.slice(0,2);oct=parseInt(flat.slice(2));}
+  else{name=flat[0];oct=parseInt(flat.slice(1));}
+  return (oct+1)*12 + NOTE_NAMES.indexOf(name);
+}
+
 function playPianoNote(t, note, dur, vol){
   const ctx=getCtx(), freq=noteToFreq(note);
   const type = document.getElementById('pianoSound').value;
+
+  // Preferred: real sampled instrument scheduled at absolute time t
+  const smp = btSampler();
+  if(smp && smp.play(noteToMidiBT(note), {at:t, duration:dur, velocity:vol})) return;
+
   const mg=ctx.createGain();
   mg.gain.setValueAtTime(0,t); mg.gain.linearRampToValueAtTime(vol,t+.015);
   mg.gain.exponentialRampToValueAtTime(vol*.4,t+.25);

@@ -11,12 +11,21 @@ _on_vercel = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
 
 # ── Core ─────────────────────────────────────────────────────────────────────
 
-SECRET_KEY = os.environ.get(
-    "SECRET_KEY",
-    "django-insecure-($)0yh77gshs)bn*@2=_s!!^!**o-!4%-j0uc)la$7i8p%5h@z",
-)
-
 DEBUG = os.environ.get("DEBUG", "False") == "True"
+
+# SECRET_KEY must come from the environment in production. The old committed
+# fallback was public (it lives in git history), so anything signed with it —
+# sessions, CSRF tokens, signed cookies — was forgeable. Fail closed instead.
+SECRET_KEY = os.environ.get("SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = "django-insecure-dev-only-key-not-for-production"
+    else:
+        from django.core.exceptions import ImproperlyConfigured
+
+        raise ImproperlyConfigured(
+            "SECRET_KEY environment variable is required when DEBUG is False."
+        )
 
 ALLOWED_HOSTS = [
     h.strip()
@@ -151,6 +160,23 @@ if not DEBUG:
 
 # Silence the SSL-redirect warning — handled by Vercel's edge, not Django.
 SILENCED_SYSTEM_CHECKS = ["security.W008"]
+
+# ── Email (contact form) ──────────────────────────────────────────────────────
+# Messages from /contact/ are delivered over SMTP to CONTACT_EMAIL. The
+# recipient address lives only in env vars, never in page source.
+# Gmail: EMAIL_HOST_USER=<your gmail>, EMAIL_HOST_PASSWORD=<16-char app password>.
+
+CONTACT_EMAIL = os.environ.get("CONTACT_EMAIL", "")
+EMAIL_HOST = os.environ.get("EMAIL_HOST", "smtp.gmail.com")
+EMAIL_PORT = int(os.environ.get("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.environ.get("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.environ.get("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.environ.get("EMAIL_USE_TLS", "True") == "True"
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "noreply@localhost")
+if not EMAIL_HOST_USER and DEBUG:
+    # Local dev without SMTP creds: print messages to the console.
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 

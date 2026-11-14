@@ -69,10 +69,29 @@ _SAFE_BUILTIN_NAMES = [
 _BLOCKED_CALLS = frozenset([
     "exec", "eval", "compile", "open", "__import__",
     "input", "breakpoint", "exit", "quit",
+    "getattr", "setattr", "delattr", "globals", "locals", "vars",
+    "dir", "super", "classmethod", "staticmethod", "property",
+    "__build_class__", "memoryview", "help",
+])
+
+# Attribute names that, even without a leading underscore, expose interpreter
+# internals and let sandboxed code walk back to the real module / builtins.
+_BLOCKED_ATTRS = frozenset([
+    "gi_frame", "gi_code", "gi_yieldfrom", "cr_frame", "cr_code",
+    "ag_frame", "ag_code", "f_back", "f_globals", "f_locals", "f_builtins",
+    "f_code", "func_globals", "func_code", "tb_frame", "tb_next",
 ])
 
 
 def _check_ast(code: str):
+    """Reject anything that could escape the music DSL.
+
+    An in-process ``exec`` sandbox is only as strong as this filter, so the
+    policy is deliberately strict: no imports, no dangerous call names, and no
+    dunder / frame attribute access (the classic ``().__class__.__bases__`` and
+    ``fn.__globals__`` escapes, plus string-based ``format`` / ``getattr``
+    variants). A music program never needs underscore attributes.
+    """
     try:
         tree = ast.parse(code)
     except SyntaxError as e:
@@ -83,6 +102,19 @@ def _check_ast(code: str):
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name):
             if node.func.id in _BLOCKED_CALLS:
                 return f"'{node.func.id}()' is not allowed"
+        if isinstance(node, ast.Attribute):
+            attr = node.attr
+            if attr.startswith("_") or attr in _BLOCKED_ATTRS:
+                return f"access to '.{attr}' is not allowed"
+        # Names bound to underscore identifiers (e.g. __builtins__) and the
+        # walrus/attribute-free dunder references.
+        if isinstance(node, ast.Name) and node.id.startswith("__") and node.id.endswith("__"):
+            return f"'{node.id}' is not allowed"
+        # Defeat string-driven escapes: "{0.__class__}".format(x), getattr by
+        # name, etc. A dunder never legitimately appears in a DSL string.
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            if "__" in node.value:
+                return "'__' is not allowed in strings"
     return None
 
 
@@ -328,9 +360,9 @@ class _MusicContext:
     def set_instrument(self, name):
         """
         Switch the active instrument.
-        Options: 'piano'  'synth'  'pad'  'bass'  'pluck'
+        Options: 'piano'  'synth'  'pad'  'bass'  'pluck'  'guitar'  'epiano'
         """
-        if str(name).lower() in {"piano", "synth", "pad", "bass", "pluck"}:
+        if str(name).lower() in {"piano", "synth", "pad", "bass", "pluck", "guitar", "epiano"}:
             self._instrument = str(name).lower()
 
     def transpose(self, semitones):

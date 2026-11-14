@@ -1,0 +1,115 @@
+{% comment %}Shared Web-Audio soundfont sampler → window.OLWSampler. Samples: FluidR3_GM via gleitz/midi-js-soundfonts (MIT), CC-BY 3.0. Every integration keeps its own fallback, so if the CDN is blocked the page still makes sound.{% endcomment %}
+<script>
+(function(){
+  if (window.OLWSampler) return;
+  var BASE = "https://gleitz.github.io/midi-js-soundfonts/FluidR3_GM/";
+  var NAMES = ['C','Db','D','Eb','E','F','Gb','G','Ab','A','Bb','B'];
+
+  // instrument -> Map(midi -> Promise<AudioBuffer>|AudioBuffer). Shared across
+  // sampler instances so switching instruments never re-downloads.
+  var CACHE = {};
+
+  function OLWSampler(instrument, opts){
+    opts = opts || {};
+    this.instrument = instrument;
+    this.minOct = opts.minOct != null ? opts.minOct : 1;
+    this.maxOct = opts.maxOct != null ? opts.maxOct : 6;
+    this.step   = opts.step   || 3;   // load every Nth semitone, pitch-shift the rest
+    this.release= opts.release!= null ? opts.release : 0.5;
+    this.gainVal= opts.gain   != null ? opts.gain : 1.0;
+    this.ctx = null; this.master = null;
+    this.buffers = new Map();          // midi -> AudioBuffer (decoded anchors)
+    this.anchors = [];
+    this.ready = false;
+  }
+
+  OLWSampler.prototype.nameFor = function(midi){
+    return NAMES[((midi % 12) + 12) % 12] + (Math.floor(midi / 12) - 1);
+  };
+
+  OLWSampler.prototype.attach = function(ctx, destination){
+    if (this.ctx === ctx && this.master) return;
+    this.ctx = ctx;
+    this.master = ctx.createGain();
+    this.master.gain.value = this.gainVal;
+    this.master.connect(destination || ctx.destination);
+  };
+
+  OLWSampler.prototype._anchorMidis = function(){
+    var out = [];
+    for (var o = this.minOct; o <= this.maxOct; o++){
+      for (var s = 0; s < 12; s += this.step){ out.push((o + 1) * 12 + s); }
+    }
+    return out;
+  };
+
+  // Loads anchor samples for the current instrument. Safe to call repeatedly.
+  OLWSampler.prototype.load = function(){
+    var self = this;
+    if (!self.ctx) return Promise.resolve(false);
+    if (self._loadingFor === self.instrument) return self._loading || Promise.resolve(self.ready);
+    self._loadingFor = self.instrument;
+    self.buffers.clear();
+    var base = BASE + self.instrument + "-mp3/";
+    CACHE[self.instrument] = CACHE[self.instrument] || {};
+    var store = CACHE[self.instrument];
+
+    var jobs = self._anchorMidis().map(function(midi){
+      if (store[midi] instanceof AudioBuffer){
+        self.buffers.set(midi, store[midi]); return Promise.resolve();
+      }
+      var url = base + self.nameFor(midi) + ".mp3";
+      return fetch(url).then(function(r){
+        if (!r.ok) return; return r.arrayBuffer();
+      }).then(function(ab){
+        if (!ab) return;
+        return new Promise(function(res){
+          self.ctx.decodeAudioData(ab, function(buf){
+            store[midi] = buf; self.buffers.set(midi, buf); res();
+          }, function(){ res(); });
+        });
+      }).catch(function(){});
+    });
+
+    self._loading = Promise.all(jobs).then(function(){
+      self.anchors = Array.from(self.buffers.keys()).sort(function(a,b){ return a - b; });
+      self.ready = self.anchors.length > 0;
+      return self.ready;
+    });
+    return self._loading;
+  };
+
+  OLWSampler.prototype.setInstrument = function(instrument){
+    if (instrument === this.instrument && this.ready) return Promise.resolve(true);
+    this.instrument = instrument; this.ready = false; this._loadingFor = null;
+    return this.load();
+  };
+
+  // Play a MIDI note. opts: {velocity 0..1, duration seconds, at absolute ctx time}
+  OLWSampler.prototype.play = function(midi, opts){
+    if (!this.ready || !this.ctx) return false;
+    opts = opts || {};
+    var best = this.anchors[0];
+    for (var i = 0; i < this.anchors.length; i++){
+      if (Math.abs(this.anchors[i] - midi) < Math.abs(best - midi)) best = this.anchors[i];
+    }
+    var buf = this.buffers.get(best);
+    if (!buf) return false;
+    var t = opts.at != null ? opts.at : this.ctx.currentTime;
+    var vel = opts.velocity != null ? opts.velocity : 0.9;
+    var dur = Math.max(0.15, opts.duration != null ? opts.duration : 1.2);
+    var src = this.ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = Math.pow(2, (midi - best) / 12);
+    var g = this.ctx.createGain();
+    g.gain.setValueAtTime(Math.max(0.0001, vel), t);
+    g.gain.setTargetAtTime(0.0001, t + dur, this.release);
+    src.connect(g); g.connect(this.master);
+    src.start(t);
+    src.stop(t + dur + this.release * 5 + 0.3);
+    return true;
+  };
+
+  window.OLWSampler = OLWSampler;
+})();
+</script>
